@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const adminSchema = new mongoose.Schema({
-    name:String,
+    name: String,
     email: {
         type: String,
         unique: true,
@@ -14,11 +14,11 @@ const adminSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    role: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Role',
-        required: true
-    },
+    // role: {
+    //     type: mongoose.Schema.Types.ObjectId,
+    //     ref: 'Role',
+    //     required: true
+    // },
     status: {
       type: String,
       enum: ['active', 'inactive'],
@@ -35,7 +35,6 @@ adminSchema.pre('save', async function (next) {
   if (admin.isModified('password')) {
     admin.password = await bcrypt.hash(admin.password, 10);
   }
-  next();
 });
 
 // Method to compare password during login
@@ -45,7 +44,8 @@ adminSchema.methods.comparePassword = function (candidatePassword) {
 
 // Method to generate an access token
 adminSchema.methods.generateAccessToken = function () {
-  return jwt.sign({ userId: this._id, role: this.role }, 'this_luvana756#', { expiresIn: '15d' });
+  return jwt.sign({ userId: this._id }, 'this_luvana756#', { expiresIn: '15d' });
+  // return jwt.sign({ userId: this._id, role: this.role }, 'this_luvana756#', { expiresIn: '15d' });
 };
 
 const Admin = mongoose.model('Admin', adminSchema);
