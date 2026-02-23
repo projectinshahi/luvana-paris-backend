@@ -5,7 +5,7 @@ const couponSchema = new mongoose.Schema({
     code: String,
     discount: Number,
     usage: Number,
-    validity: Date,
+    validity: String,
     minimumPurchase: Number,
     status: {
       type: String,

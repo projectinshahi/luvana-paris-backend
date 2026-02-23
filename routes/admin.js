@@ -5,15 +5,24 @@ const router = express.Router();
 router.use('/login', require('./admin/loginRoute'));
 
 // Use categories route
-router.use('/categories', require('./admin/categoryRoute'));
+router.use('/category', require('./admin/categoryRoute'));
 
 // Use brands route
-router.use('/brands', require('./admin/brandRoute'));
+router.use('/brand', require('./admin/brandRoute'));
+
+// Use banners route
+router.use('/banner', require('./admin/bannerRoute'));
 
 // Use promotion strips route
-router.use('/promotion-strips', require('./admin/promotionStripRoute'));
+router.use('/promotion-strip', require('./admin/promotionStripRoute'));
 
 // Use coupons route
-router.use('/coupons', require('./admin/couponRoute'));
+router.use('/coupon', require('./admin/couponRoute'));
+
+// Use products route
+router.use('/product', require('./admin/productRoute'));
+
+// Use product variants route
+router.use('/product-variant', require('./admin/productVariantRoute'));
 
 module.exports = router;
