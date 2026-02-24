@@ -16,4 +16,7 @@ router.use('/product', require('./user/productRoute'));
 // Cart routes
 router.use('/cart', require('./user/cartRoute'));
 
+// Promotion strips route
+router.use('/promotion-strip', require('./user/promotionStripRoute'));
+
 module.exports = router;

@@ -66,7 +66,7 @@ const addToCart = async (req, res) => {
 // Get cart with all calculations
 const getCart = async (req, res) => {
   try {
-    const userId = req.user._id; // Assuming authentication middleware sets req.user
+    const userId = '699ba09e0f60cad1fb5f3c46';//req.user._id; // Assuming authentication middleware sets req.user
 
     // Get all cart items for user
     const cartItems = await Cart.find({ user: userId })

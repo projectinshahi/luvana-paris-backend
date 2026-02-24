@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const adminAuthMiddleware = require('../middleware/adminAuthMiddleware');
 
 // Use login route
 router.use('/login', require('./admin/loginRoute'));
+
+// Apply admin authentication middleware to all routes below
+// router.use(adminAuthMiddleware);
 
 // Use categories route
 router.use('/category', require('./admin/categoryRoute'));
