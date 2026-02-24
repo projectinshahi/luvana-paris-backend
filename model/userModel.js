@@ -13,8 +13,14 @@ const userSchema = new mongoose.Schema({
     phone: String,
     password: {
       type: String,
-      required: true,
+      required: false,
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    profilePicture: String,
     status: {
       type: String,
       enum: ['active', 'inactive'],
