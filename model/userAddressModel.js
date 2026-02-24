@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 
 const userAddressSchema = new mongoose.Schema({
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    type: String,
     name: String,
     phone: String,
     email: String,

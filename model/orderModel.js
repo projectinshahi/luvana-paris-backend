@@ -23,6 +23,8 @@ const orderSchema = new mongoose.Schema({
             product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
             productNameEnglish: String,
             productNameArabic: String,
+        productImageEnglish: String,
+        productImageArabic: String,
             variant: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductVarients' },
             quantity: Number,
             price: Number,

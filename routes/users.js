@@ -16,6 +16,18 @@ router.use('/product', require('./user/productRoute'));
 // Cart routes
 router.use('/cart', require('./user/cartRoute'));
 
+// Wishlist routes
+router.use('/wishlist', require('./user/wishlistRoute'));
+
+// Address routes
+router.use('/address', require('./user/addressRoute'));
+
+// Profile routes
+router.use('/profile', require('./user/profileRoute'));
+
+// Orders routes
+router.use('/order', require('./user/orderRoute'));
+
 // Promotion strips route
 router.use('/promotion-strip', require('./user/promotionStripRoute'));
 
