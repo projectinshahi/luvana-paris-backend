@@ -1,0 +1,22 @@
+const mongoose = require('mongoose');
+
+const brandSchema = new mongoose.Schema({
+    nameEnglish: String,
+    nameArabic: String,
+    descriptionEnglish: String,
+    descriptionArabic: String,
+    logoUrlEnglish: String,
+    logoUrlArabic: String,
+    status: {
+      type: String,
+      enum: ['active', 'inactive'],
+      default: 'active',
+    },
+},
+{
+    timestamps: true, 
+});
+
+const Brand = mongoose.model('Brand', brandSchema);
+
+module.exports = Brand;
