@@ -1,6 +1,121 @@
 const Product = require('../../model/productModel');
 const ProductVariants = require('../../model/productVariantsModel');
 
+// Get products list with pagination and filters
+const getProducts = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      minPrice,
+      maxPrice,
+      category,
+      brand,
+      search
+    } = req.query;
+
+    const pageNumber = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNumber = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+
+    const productQuery = { status: 'active' };
+
+    if (category) {
+      productQuery.category = category;
+    }
+
+    if (brand) {
+      productQuery.brand = brand;
+    }
+
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      productQuery.$or = [
+        { nameEnglish: searchRegex },
+        { nameArabic: searchRegex }
+      ];
+    }
+
+    const hasMinPrice = minPrice !== undefined && minPrice !== '';
+    const hasMaxPrice = maxPrice !== undefined && maxPrice !== '';
+    if (hasMinPrice || hasMaxPrice) {
+      const priceFilter = { status: 'active' };
+      if (hasMinPrice) {
+        priceFilter.price = { ...priceFilter.price, $gte: Number(minPrice) };
+      }
+      if (hasMaxPrice) {
+        priceFilter.price = { ...priceFilter.price, $lte: Number(maxPrice) };
+      }
+
+      const productIds = await ProductVariants.distinct('product', priceFilter);
+      if (productIds.length === 0) {
+        return res.json({
+          items: [],
+          pagination: {
+            page: pageNumber,
+            limit: limitNumber,
+            totalItems: 0,
+            totalPages: 0
+          }
+        });
+      }
+
+      productQuery._id = { $in: productIds };
+    }
+
+    const totalItems = await Product.countDocuments(productQuery);
+    const totalPages = Math.ceil(totalItems / limitNumber);
+
+    const products = await Product.find(productQuery)
+      .populate('category', 'nameEnglish nameArabic')
+      .populate('brand', 'nameEnglish nameArabic')
+      .sort({ createdAt: -1 })
+      .skip((pageNumber - 1) * limitNumber)
+      .limit(limitNumber);
+
+    const productIds = products.map(p => p._id);
+    const variants = await ProductVariants.find({
+      product: { $in: productIds },
+      status: 'active'
+    }).select('product nameEnglish nameArabic color stock price mrp');
+
+    const variantsByProduct = variants.reduce((acc, variant) => {
+      const key = String(variant.product);
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(variant);
+      return acc;
+    }, {});
+
+    const enrichedProducts = products.map((product) => {
+      const productVariants = variantsByProduct[String(product._id)] || [];
+      // const prices = productVariants.map(v => v.price);
+      // const mrps = productVariants.map(v => v.mrp);
+
+      return {
+        ...product.toObject(),
+        variants: productVariants,
+        // minPrice: prices.length > 0 ? Math.min(...prices) : null,
+        // maxPrice: mrps.length > 0 ? Math.max(...mrps) : null,
+        totalStock: productVariants.reduce((sum, v) => sum + v.stock, 0)
+      };
+    });
+
+    res.json({
+      items: enrichedProducts,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalItems,
+        totalPages
+      }
+    });
+  } catch (error) {
+    console.error('Get products error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Get single product details with similar products
 const getProductDetails = async (req, res) => {
   try {
@@ -98,5 +213,6 @@ const getProductDetails = async (req, res) => {
 };
 
 module.exports = {
+  getProducts,
   getProductDetails
 };
