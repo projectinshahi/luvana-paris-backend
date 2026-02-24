@@ -7,6 +7,10 @@ const productSchema = new mongoose.Schema({
     nameArabic: String,
     shortDescriptionEnglish: String,
     shortDescriptionArabic: String,
+    isNew: {
+      type: Boolean,
+      default: false,
+    },
     status: {
       type: String,
       enum: ['active', 'inactive'],
