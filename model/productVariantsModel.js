@@ -15,6 +15,12 @@ const productVariantsSchema = new mongoose.Schema({
       enum: ['active', 'inactive'],
       default: 'active',
     },
+    imageUrlEnglish: [{
+        imageUrl: String,
+    }],
+    imageUrlArabic: [{
+        imageUrl: String,
+    }],
 },
 {
     timestamps: true, 

@@ -53,7 +53,7 @@ const getAllOrders = async (req, res) => {
       .populate('shippingAddress')
       .populate('coupon', 'code discount')
       .populate('orderItem.product', 'nameEnglish nameArabic')
-      .populate('orderItem.variant', 'size color price')
+      .populate('orderItem.variant', 'nameEnglish nameArabic size color price mrp stock imageUrlEnglish imageUrlArabic')
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -85,7 +85,7 @@ const getOrderById = async (req, res) => {
       .populate('shippingAddress')
       .populate('coupon', 'code discount minimumPurchase')
       .populate('orderItem.product', 'nameEnglish nameArabic imageUrlEnglish imageUrlArabic')
-      .populate('orderItem.variant', 'size color price mrp stock');
+      .populate('orderItem.variant', 'nameEnglish nameArabic size color price mrp stock imageUrlEnglish imageUrlArabic');
 
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
@@ -126,7 +126,7 @@ const updateOrderStatus = async (req, res) => {
       .populate('shippingAddress')
       .populate('coupon', 'code discount')
       .populate('orderItem.product', 'nameEnglish nameArabic')
-      .populate('orderItem.variant', 'size color price');
+      .populate('orderItem.variant', 'nameEnglish nameArabic size color price mrp stock imageUrlEnglish imageUrlArabic');
 
     res.json({
       message: 'Order status updated successfully',
@@ -166,7 +166,7 @@ const updatePaymentStatus = async (req, res) => {
       .populate('shippingAddress')
       .populate('coupon', 'code discount')
       .populate('orderItem.product', 'nameEnglish nameArabic')
-      .populate('orderItem.variant', 'size color price');
+      .populate('orderItem.variant', 'nameEnglish nameArabic size color price mrp stock imageUrlEnglish imageUrlArabic');
 
     res.json({
       message: 'Payment status updated successfully',

@@ -71,7 +71,7 @@ const getUserById = async (req, res) => {
     const orders = await Order.find({ user: id })
       .populate('coupon', 'code discount')
       .populate('orderItem.product', 'nameEnglish nameArabic')
-      .populate('orderItem.variant', 'size color price')
+      .populate('orderItem.variant', 'nameEnglish nameArabic size color price mrp stock imageUrlEnglish imageUrlArabic')
       .sort({ createdAt: -1 });
 
     // Calculate total orders count

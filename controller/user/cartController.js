@@ -103,7 +103,9 @@ const getCart = async (req, res) => {
           nameArabic: variant.nameArabic,
           color: variant.color,
           price: variant.price,
-          mrp: variant.mrp
+          mrp: variant.mrp,
+          imageUrlEnglish: variant.imageUrlEnglish,
+          imageUrlArabic: variant.imageUrlArabic
         },
         quantity: item.quantity,
         itemPrice,
