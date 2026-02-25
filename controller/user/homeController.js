@@ -24,7 +24,7 @@ const getHome = async (req, res) => {
       .limit(10);
 
     // Get featured products with variants and pricing
-    const featuredProducts = await Product.find({ status: 'active' })
+    const featuredProducts = await Product.find({ status: 'active', isFeatured: true })
       .populate('category', 'nameEnglish nameArabic')
       .populate('brand', 'nameEnglish nameArabic')
       .limit(10);

@@ -42,7 +42,9 @@ const createProduct = async (req, res) => {
       shortDescriptionArabic, 
       description, 
       imageUrlEnglish, 
-      imageUrlArabic, 
+      imageUrlArabic,
+      isNew,
+      isFeatured,
       status 
     } = req.body;
 
@@ -56,6 +58,8 @@ const createProduct = async (req, res) => {
       description,
       imageUrlEnglish,
       imageUrlArabic,
+      isNew: isNew || false,
+      isFeatured: isFeatured || false,
       status: status || 'active'
     });
 
