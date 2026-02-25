@@ -16,9 +16,10 @@ const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://hrithikelayur12_db_user:iRIFZyWr6uZEE5k9@luana-paris.ei5r1tm.mongodb.net/luvana-paris';
 
 // Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/luvana-paris', {
+mongoose.connect(MONGODB_URI, {
   // useNewUrlParser: true,
   // useUnifiedTopology: true,
 })

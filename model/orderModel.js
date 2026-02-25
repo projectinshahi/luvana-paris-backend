@@ -25,7 +25,7 @@ const orderSchema = new mongoose.Schema({
             productNameArabic: String,
         productImageEnglish: String,
         productImageArabic: String,
-            variant: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductVarients' },
+            variant: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductVariants' },
             quantity: Number,
             price: Number,
             discount: Number,
