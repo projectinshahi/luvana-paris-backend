@@ -4,6 +4,7 @@ const ProductVariants = require('../../model/productVariantsModel');
 const getAllProductVariants = async (req, res) => {
   try {
     const variants = await ProductVariants.find({ status: 'active' })
+      .select('nameEnglish nameArabic shortDescriptionEnglish shortDescriptionArabic color stock price mrp status imageUrlEnglish imageUrlArabic product createdAt updatedAt')
       .populate('product', 'nameEnglish nameArabic');
     res.json(variants);
   } catch (error) {
@@ -16,7 +17,8 @@ const getAllProductVariants = async (req, res) => {
 const getVariantsByProductId = async (req, res) => {
   try {
     const { productId } = req.params;
-    const variants = await ProductVariants.find({ product: productId, status: 'active' });
+    const variants = await ProductVariants.find({ product: productId, status: 'active' })
+      .select('nameEnglish nameArabic shortDescriptionEnglish shortDescriptionArabic color stock price mrp status imageUrlEnglish imageUrlArabic product createdAt updatedAt');
     res.json(variants);
   } catch (error) {
     console.error('Get variants by product ID error:', error);
@@ -29,6 +31,7 @@ const getProductVariantById = async (req, res) => {
   try {
     const { id } = req.params;
     const variant = await ProductVariants.findById(id)
+      .select('nameEnglish nameArabic shortDescriptionEnglish shortDescriptionArabic color stock price mrp status imageUrlEnglish imageUrlArabic product createdAt updatedAt')
       .populate('product', 'nameEnglish nameArabic');
     if (!variant) {
       return res.status(404).json({ message: 'Product variant not found' });
@@ -43,7 +46,7 @@ const getProductVariantById = async (req, res) => {
 // Create new product variant
 const createProductVariant = async (req, res) => {
   try {
-    const { product, nameEnglish, nameArabic, shortDescriptionEnglish, shortDescriptionArabic, color, stock, price, mrp, status } = req.body;
+    const { product, nameEnglish, nameArabic, shortDescriptionEnglish, shortDescriptionArabic, color, stock, price, mrp, status, imageUrlEnglish, imageUrlArabic } = req.body;
 
     // Validation
     if (!product || !nameEnglish || !nameArabic || stock === undefined || price === undefined || mrp === undefined) {
@@ -76,11 +79,14 @@ const createProductVariant = async (req, res) => {
       stock,
       price,
       mrp,
-      status: status || 'active'
+      status: status || 'active',
+      imageUrlEnglish: imageUrlEnglish || [],
+      imageUrlArabic: imageUrlArabic || []
     });
 
     const savedVariant = await newVariant.save();
     const populatedVariant = await ProductVariants.findById(savedVariant._id)
+      .select('nameEnglish nameArabic shortDescriptionEnglish shortDescriptionArabic color stock price mrp status imageUrlEnglish imageUrlArabic product createdAt updatedAt')
       .populate('product', 'nameEnglish nameArabic');
     res.status(201).json(populatedVariant);
   } catch (error) {
@@ -112,7 +118,17 @@ const updateProductVariant = async (req, res) => {
       return res.status(400).json({ message: 'Price cannot be greater than MRP' });
     }
 
+    // Ensure imageUrlEnglish and imageUrlArabic are arrays if provided
+    if (updates.imageUrlEnglish !== undefined && !Array.isArray(updates.imageUrlEnglish)) {
+      return res.status(400).json({ message: 'imageUrlEnglish must be an array' });
+    }
+
+    if (updates.imageUrlArabic !== undefined && !Array.isArray(updates.imageUrlArabic)) {
+      return res.status(400).json({ message: 'imageUrlArabic must be an array' });
+    }
+
     const updatedVariant = await ProductVariants.findByIdAndUpdate(id, updates, { new: true })
+      .select('nameEnglish nameArabic shortDescriptionEnglish shortDescriptionArabic color stock price mrp status imageUrlEnglish imageUrlArabic product createdAt updatedAt')
       .populate('product', 'nameEnglish nameArabic');
     if (!updatedVariant) {
       return res.status(404).json({ message: 'Product variant not found' });

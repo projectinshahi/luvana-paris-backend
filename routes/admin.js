@@ -29,4 +29,10 @@ router.use('/product', require('./admin/productRoute'));
 // Use product variants route
 router.use('/product-variant', require('./admin/productVariantRoute'));
 
+// Use orders route
+router.use('/order', require('./admin/orderRoute'));
+
+// Use users route
+router.use('/customer', require('./admin/userRoute'));
+
 module.exports = router;

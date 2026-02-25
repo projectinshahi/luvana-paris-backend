@@ -69,7 +69,7 @@ const getWishlist = async (req, res) => {
 
     const wishlistItems = await Wishlist.find({ user: userId })
       .populate('product', 'nameEnglish nameArabic imageUrlEnglish imageUrlArabic')
-      .populate('variant', 'nameEnglish nameArabic color price mrp stock');
+      .populate('variant', 'nameEnglish nameArabic color price mrp stock imageUrlEnglish imageUrlArabic');
 
     res.json({
       items: wishlistItems

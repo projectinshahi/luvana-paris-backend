@@ -178,6 +178,7 @@ const getOrders = async (req, res) => {
       .populate('shippingAddress')
       .populate('coupon', 'code discount')
       .populate('orderItem.product', 'nameEnglish nameArabic')
+      .populate('orderItem.variant', 'nameEnglish nameArabic size color price mrp stock imageUrlEnglish imageUrlArabic')
       .sort({ createdAt: -1 });
 
     res.json({
