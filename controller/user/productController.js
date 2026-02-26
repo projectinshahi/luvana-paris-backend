@@ -149,6 +149,8 @@ const getProductDetails = async (req, res) => {
         nameArabic: v.nameArabic,
         shortDescriptionEnglish: v.shortDescriptionEnglish,
         shortDescriptionArabic: v.shortDescriptionArabic,
+        imageUrlEnglish: v.imageUrlEnglish,
+        imageUrlArabic: v.imageUrlArabic,
         color: v.color,
         stock: v.stock,
         price: v.price,
