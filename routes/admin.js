@@ -38,6 +38,9 @@ router.use('/customer', require('./admin/userRoute'));
 // Use influencer route
 router.use('/influencer', require('./admin/influencerRoute'));
 
+// Use dashboard route
+router.use('/dashboard', require('./admin/dashboardRoute'));
+
 // Image upload route
 router.use('/general', require('./admin/generalRoute'));
 
