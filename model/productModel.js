@@ -36,9 +36,11 @@ const productSchema = new mongoose.Schema({
     }],
     imageUrlEnglish: [{
         imageUrl: String,
+        publicId: String,
     }],
     imageUrlArabic: [{
         imageUrl: String,
+        publicId: String,
     }],
 },
 {

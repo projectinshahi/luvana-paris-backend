@@ -3,7 +3,7 @@ const Brand = require('../../model/brandModel');
 // Get all brands
 const getAllBrands = async (req, res) => {
   try {
-    const brands = await Brand.find({ status: 'active' });
+    const brands = await Brand.find();
     res.json(brands);
   } catch (error) {
     console.error('Get brands error:', error);
