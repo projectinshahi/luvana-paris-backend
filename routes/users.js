@@ -31,4 +31,7 @@ router.use('/order', require('./user/orderRoute'));
 // Promotion strips route
 router.use('/promotion-strip', require('./user/promotionStripRoute'));
 
+// Influencer route
+router.use('/influencer', require('./user/influencerRoute'));
+
 module.exports = router;
