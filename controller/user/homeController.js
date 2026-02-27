@@ -19,14 +19,14 @@ const getHome = async (req, res) => {
     // Get new products (latest 10)
     const newProducts = await Product.find({ status: 'active', isNew: true })
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic')
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
       .sort({ createdAt: -1 })
       .limit(10);
 
     // Get featured products with variants and pricing
     const featuredProducts = await Product.find({ status: 'active', isFeatured: true })
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic')
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
       .limit(10);
 
     // Enrich products with variant data (price, stock, etc.)

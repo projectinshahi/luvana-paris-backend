@@ -7,6 +7,12 @@ const brandSchema = new mongoose.Schema({
     descriptionArabic: String,
     logoUrlEnglish: String,
     logoUrlArabic: String,
+    logoPublicIdEnglish: String,
+    logoPublicIdArabic: String,
+    brandImageEnglish: String,
+    brandImageArabic: String,
+    brandImagePublicIdEnglish: String,
+    brandImagePublicIdArabic: String,
     status: {
       type: String,
       enum: ['active', 'inactive'],

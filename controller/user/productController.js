@@ -67,7 +67,7 @@ const getProducts = async (req, res) => {
 
     const products = await Product.find(productQuery)
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic')
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
       .sort({ createdAt: -1 })
       .skip((pageNumber - 1) * limitNumber)
       .limit(limitNumber);
@@ -124,7 +124,7 @@ const getProductDetails = async (req, res) => {
     // Get product by ID with populated references
     const product = await Product.findById(id)
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic');
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic');
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
@@ -174,7 +174,7 @@ const getProductDetails = async (req, res) => {
       status: 'active'
     })
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic')
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
       .limit(8);
 
     // Enrich similar products with variant data

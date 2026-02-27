@@ -5,7 +5,7 @@ const getAllProducts = async (req, res) => {
   try {
     const products = await Product.find({ status: 'active' })
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic');
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic');
     res.json(products);
   } catch (error) {
     console.error('Get products error:', error);
@@ -19,7 +19,7 @@ const getProductById = async (req, res) => {
     const { id } = req.params;
     const product = await Product.findById(id)
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic');
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic');
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
@@ -66,7 +66,7 @@ const createProduct = async (req, res) => {
     const savedProduct = await newProduct.save();
     const populatedProduct = await Product.findById(savedProduct._id)
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic');
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic');
     res.status(201).json(populatedProduct);
   } catch (error) {
     console.error('Create product error:', error);
@@ -82,7 +82,7 @@ const updateProduct = async (req, res) => {
 
     const updatedProduct = await Product.findByIdAndUpdate(id, updates, { new: true })
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic');
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic');
     if (!updatedProduct) {
       return res.status(404).json({ message: 'Product not found' });
     }

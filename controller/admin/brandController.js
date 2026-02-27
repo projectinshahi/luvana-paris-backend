@@ -29,7 +29,21 @@ const getBrandById = async (req, res) => {
 // Create new brand
 const createBrand = async (req, res) => {
   try {
-    const { nameEnglish, nameArabic, descriptionEnglish, descriptionArabic, logoUrlEnglish, logoUrlArabic, status } = req.body;
+    const { 
+      nameEnglish, 
+      nameArabic, 
+      descriptionEnglish, 
+      descriptionArabic, 
+      logoUrlEnglish, 
+      logoUrlArabic,
+      logoPublicIdEnglish,
+      logoPublicIdArabic,
+      brandImageEnglish,
+      brandImageArabic,
+      brandImagePublicIdEnglish,
+      brandImagePublicIdArabic,
+      status 
+    } = req.body;
 
     const newBrand = new Brand({
       nameEnglish,
@@ -38,6 +52,12 @@ const createBrand = async (req, res) => {
       descriptionArabic,
       logoUrlEnglish,
       logoUrlArabic,
+      logoPublicIdEnglish,
+      logoPublicIdArabic,
+      brandImageEnglish,
+      brandImageArabic,
+      brandImagePublicIdEnglish,
+      brandImagePublicIdArabic,
       status: status || 'active'
     });
 
