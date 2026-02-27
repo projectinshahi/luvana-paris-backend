@@ -7,7 +7,9 @@ const bannerSchema = new mongoose.Schema({
     descriptionEnglish: String,
     descriptionArabic: String,
     imageUrlEnglish: String,
+    publicIdEnglish: String,
     imageUrlArabic: String,
+    publicIdArabic: String,
     sortOrder: Number,
     status: {
       type: String,

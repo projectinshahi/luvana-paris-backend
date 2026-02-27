@@ -35,4 +35,10 @@ router.use('/order', require('./admin/orderRoute'));
 // Use users route
 router.use('/customer', require('./admin/userRoute'));
 
+// Use influencer route
+router.use('/influencer', require('./admin/influencerRoute'));
+
+// Image upload route
+router.use('/general', require('./admin/generalRoute'));
+
 module.exports = router;

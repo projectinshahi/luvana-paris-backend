@@ -3,7 +3,7 @@ const PromotionStrip = require('../../model/promotionStripModel');
 // Get all promotion strips
 const getAllPromotionStrips = async (req, res) => {
   try {
-    const promotionStrips = await PromotionStrip.find({ status: 'active' }).sort({ sortOrder: 1 });
+    const promotionStrips = await PromotionStrip.find().sort({ sortOrder: 1 });
     res.json(promotionStrips);
   } catch (error) {
     console.error('Get promotion strips error:', error);

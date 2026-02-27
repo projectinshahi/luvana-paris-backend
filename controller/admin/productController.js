@@ -3,9 +3,9 @@ const Product = require('../../model/productModel');
 // Get all products
 const getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find({ status: 'active' })
+    const products = await Product.find()
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic');
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic');
     res.json(products);
   } catch (error) {
     console.error('Get products error:', error);
@@ -19,7 +19,7 @@ const getProductById = async (req, res) => {
     const { id } = req.params;
     const product = await Product.findById(id)
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic');
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic');
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
@@ -48,6 +48,16 @@ const createProduct = async (req, res) => {
       status 
     } = req.body;
 
+    // Validate imageUrlEnglish structure
+    if (imageUrlEnglish && !Array.isArray(imageUrlEnglish)) {
+      return res.status(400).json({ message: 'imageUrlEnglish must be an array' });
+    }
+
+    // Validate imageUrlArabic structure
+    if (imageUrlArabic && !Array.isArray(imageUrlArabic)) {
+      return res.status(400).json({ message: 'imageUrlArabic must be an array' });
+    }
+
     const newProduct = new Product({
       category,
       brand,
@@ -56,8 +66,8 @@ const createProduct = async (req, res) => {
       shortDescriptionEnglish,
       shortDescriptionArabic,
       description,
-      imageUrlEnglish,
-      imageUrlArabic,
+      imageUrlEnglish: imageUrlEnglish || [],
+      imageUrlArabic: imageUrlArabic || [],
       isNew: isNew || false,
       isFeatured: isFeatured || false,
       status: status || 'active'
@@ -66,7 +76,7 @@ const createProduct = async (req, res) => {
     const savedProduct = await newProduct.save();
     const populatedProduct = await Product.findById(savedProduct._id)
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic');
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic');
     res.status(201).json(populatedProduct);
   } catch (error) {
     console.error('Create product error:', error);
@@ -80,9 +90,19 @@ const updateProduct = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
+    // Validate imageUrlEnglish structure if provided
+    if (updates.imageUrlEnglish !== undefined && !Array.isArray(updates.imageUrlEnglish)) {
+      return res.status(400).json({ message: 'imageUrlEnglish must be an array' });
+    }
+
+    // Validate imageUrlArabic structure if provided
+    if (updates.imageUrlArabic !== undefined && !Array.isArray(updates.imageUrlArabic)) {
+      return res.status(400).json({ message: 'imageUrlArabic must be an array' });
+    }
+
     const updatedProduct = await Product.findByIdAndUpdate(id, updates, { new: true })
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic');
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic');
     if (!updatedProduct) {
       return res.status(404).json({ message: 'Product not found' });
     }

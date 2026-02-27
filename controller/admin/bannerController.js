@@ -3,7 +3,7 @@ const Banner = require('../../model/bannerModel');
 // Get all banners
 const getAllBanners = async (req, res) => {
   try {
-    const banners = await Banner.find({ status: 'active' }).sort({ sortOrder: 1 });
+    const banners = await Banner.find().sort({ sortOrder: 1 });
     res.json(banners);
   } catch (error) {
     console.error('Get banners error:', error);

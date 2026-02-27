@@ -4,6 +4,7 @@ const Category = require('../../model/categoryModel');
 const Brand = require('../../model/brandModel');
 const Product = require('../../model/productModel');
 const ProductVariants = require('../../model/productVariantsModel');
+const Influencer = require('../../model/influencerModel');
 
 const getHome = async (req, res) => {
   try {
@@ -19,15 +20,22 @@ const getHome = async (req, res) => {
     // Get new products (latest 10)
     const newProducts = await Product.find({ status: 'active', isNew: true })
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic')
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
       .sort({ createdAt: -1 })
       .limit(10);
 
     // Get featured products with variants and pricing
     const featuredProducts = await Product.find({ status: 'active', isFeatured: true })
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic')
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
       .limit(10);
+
+    // Get active influencers sorted by sortOrder
+    const influencers = await Influencer.find({ status: 'active' })
+      .populate('product', 'nameEnglish nameArabic imageUrlEnglish imageUrlArabic')
+      .populate('variant', 'nameEnglish nameArabic color price mrp imageUrlEnglish imageUrlArabic')
+      .sort({ sortOrder: 1 })
+      .select('titleEnglish titleArabic product variant videoUrl');
 
     // Enrich products with variant data (price, stock, etc.)
     const enrichedFeaturedProducts = await Promise.all(
@@ -87,6 +95,7 @@ const getHome = async (req, res) => {
       brands,
       newProducts: enrichedNewProducts,
       featuredProducts: enrichedFeaturedProducts,
+      influencers
     });
   } catch (error) {
     console.error('Get home error:', error);
