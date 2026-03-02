@@ -1,6 +1,33 @@
 const Product = require('../../model/productModel');
 const ProductVariants = require('../../model/productVariantsModel');
 
+const parseMultiFilterValues = (value) => {
+  const sanitizeToken = (token) => String(token)
+    .trim()
+    .replace(/^\[+/, '')
+    .replace(/\]+$/, '')
+    .replace(/^['"]+/, '')
+    .replace(/['"]+$/, '');
+
+  const isValidObjectIdLike = (token) => /^[a-fA-F0-9]{24}$/.test(token);
+
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((item) => String(item).split(','))
+      .map(sanitizeToken)
+      .filter((item) => item && isValidObjectIdLike(item));
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map(sanitizeToken)
+      .filter((item) => item && isValidObjectIdLike(item));
+  }
+
+  return [];
+};
+
 // Get products list with pagination and filters
 const getProducts = async (req, res) => {
   try {
@@ -19,12 +46,18 @@ const getProducts = async (req, res) => {
 
     const productQuery = { status: 'active' };
 
-    if (category) {
-      productQuery.category = category;
+    const categoryValues = parseMultiFilterValues(category);
+    if (categoryValues.length === 1) {
+      productQuery.category = categoryValues[0];
+    } else if (categoryValues.length > 1) {
+      productQuery.category = { $in: categoryValues };
     }
 
-    if (brand) {
-      productQuery.brand = brand;
+    const brandValues = parseMultiFilterValues(brand);
+    if (brandValues.length === 1) {
+      productQuery.brand = brandValues[0];
+    } else if (brandValues.length > 1) {
+      productQuery.brand = { $in: brandValues };
     }
 
     if (search) {
