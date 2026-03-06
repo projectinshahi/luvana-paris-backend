@@ -1,12 +1,58 @@
 const Product = require('../../model/productModel');
 
-// Get all products
+// Get all products with filters
 const getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find()
+    const { page = 1, limit = 10, search, status, category, brand } = req.query;
+
+    const pageNumber = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNumber = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+
+    const query = {};
+
+    // Search filter
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      query.$or = [
+        { nameEnglish: searchRegex },
+        { nameArabic: searchRegex }
+      ];
+    }
+
+    // Status filter
+    if (status) {
+      query.status = status;
+    }
+
+    // Category filter
+    if (category) {
+      query.category = category;
+    }
+
+    // Brand filter
+    if (brand) {
+      query.brand = brand;
+    }
+
+    const totalItems = await Product.countDocuments(query);
+    const totalPages = Math.ceil(totalItems / limitNumber);
+
+    const products = await Product.find(query)
       .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic');
-    res.json(products);
+      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
+      .sort({ createdAt: -1 })
+      .skip((pageNumber - 1) * limitNumber)
+      .limit(limitNumber);
+
+    res.json({
+      items: products,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        totalItems,
+        totalPages
+      }
+    });
   } catch (error) {
     console.error('Get products error:', error);
     res.status(500).json({ message: 'Internal server error' });
