@@ -1,6 +1,18 @@
 const Cart = require('../../model/cartModel');
 const ProductVariants = require('../../model/productVariantsModel');
 const Coupon = require('../../model/couponModel');
+const Country = require('../../model/countryModel');
+
+// Helper function to calculate currency conversions for all active countries
+const calculateCurrencyConversions = async (mrp, price) => {
+  const activeCountries = await Country.find({ status: 'active' });
+  
+  return activeCountries.map(country => ({
+    country: country.nameEnglish || country.nameArabic,
+    mrp: parseFloat((mrp * parseFloat(country.currencyValue || 1)).toFixed(2)),
+    price: parseFloat((price * parseFloat(country.currencyValue || 1)).toFixed(2))
+  }));
+};
 
 // Add to cart
 const addToCart = async (req, res) => {
@@ -88,32 +100,35 @@ const getCart = async (req, res) => {
     }
 
     // Calculate prices for each item
-    const enrichedItems = cartItems.map(item => {
-      const variant = item.variant;
-      const itemPrice = variant.price * item.quantity;
-      const mrpPrice = variant.mrp * item.quantity;
-      const itemDiscount = mrpPrice - itemPrice;
+    const enrichedItems = await Promise.all(
+      cartItems.map(async (item) => {
+        const variant = item.variant;
+        const itemPrice = variant.price * item.quantity;
+        const mrpPrice = variant.mrp * item.quantity;
+        const itemDiscount = mrpPrice - itemPrice;
 
-      return {
-        _id: item._id,
-        product: item.product,
-        variant: {
-          _id: variant._id,
-          nameEnglish: variant.nameEnglish,
-          nameArabic: variant.nameArabic,
-          color: variant.color,
-          price: variant.price,
-          mrp: variant.mrp,
-          imageUrlEnglish: variant.imageUrlEnglish,
-          imageUrlArabic: variant.imageUrlArabic
-        },
-        quantity: item.quantity,
-        itemPrice,
-        mrpPrice,
-        itemDiscount,
-        coupon: item.coupon
-      };
-    });
+        return {
+          _id: item._id,
+          product: item.product,
+          variant: {
+            _id: variant._id,
+            nameEnglish: variant.nameEnglish,
+            nameArabic: variant.nameArabic,
+            color: variant.color,
+            price: variant.price,
+            mrp: variant.mrp,
+            imageUrlEnglish: variant.imageUrlEnglish,
+            imageUrlArabic: variant.imageUrlArabic,
+            currency: await calculateCurrencyConversions(variant.mrp, variant.price)
+          },
+          quantity: item.quantity,
+          itemPrice,
+          mrpPrice,
+          itemDiscount,
+          coupon: item.coupon
+        };
+      })
+    );
 
     // Calculate subtotal (selling price)
     let subtotal = enrichedItems.reduce((sum, item) => sum + item.itemPrice, 0);

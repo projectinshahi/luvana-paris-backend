@@ -1,6 +1,18 @@
 const Wishlist = require('../../model/wshlistModel');
 const Product = require('../../model/productModel');
 const ProductVariants = require('../../model/productVariantsModel');
+const Country = require('../../model/countryModel');
+
+// Helper function to calculate currency conversions for all active countries
+const calculateCurrencyConversions = async (mrp, price) => {
+  const activeCountries = await Country.find({ status: 'active' });
+  
+  return activeCountries.map(country => ({
+    country: country.nameEnglish || country.nameArabic,
+    mrp: parseFloat((mrp * parseFloat(country.currencyValue || 1)).toFixed(2)),
+    price: parseFloat((price * parseFloat(country.currencyValue || 1)).toFixed(2))
+  }));
+};
 
 // Add item to wishlist
 const addToWishlist = async (req, res) => {
@@ -71,8 +83,22 @@ const getWishlist = async (req, res) => {
       .populate('product', 'nameEnglish nameArabic imageUrlEnglish imageUrlArabic')
       .populate('variant', 'nameEnglish nameArabic color price mrp stock imageUrlEnglish imageUrlArabic');
 
+    // Enrich variants with currency conversions
+    const enrichedItems = await Promise.all(
+      wishlistItems.map(async (item) => {
+        const itemObj = item.toObject();
+        if (itemObj.variant && itemObj.variant.price !== undefined && itemObj.variant.mrp !== undefined) {
+          itemObj.variant.currency = await calculateCurrencyConversions(
+            itemObj.variant.mrp, 
+            itemObj.variant.price
+          );
+        }
+        return itemObj;
+      })
+    );
+
     res.json({
-      items: wishlistItems
+      items: enrichedItems
     });
   } catch (error) {
     console.error('Get wishlist error:', error);

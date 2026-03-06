@@ -1,5 +1,6 @@
 const Product = require('../../model/productModel');
 const ProductVariants = require('../../model/productVariantsModel');
+const Country = require('../../model/countryModel');
 
 const parseMultiFilterValues = (value) => {
   const sanitizeToken = (token) => String(token)
@@ -26,6 +27,17 @@ const parseMultiFilterValues = (value) => {
   }
 
   return [];
+};
+
+// Helper function to calculate currency conversions for all active countries
+const calculateCurrencyConversions = async (mrp, price) => {
+  const activeCountries = await Country.find({ status: 'active' });
+  
+  return activeCountries.map(country => ({
+    country: country.nameEnglish || country.nameArabic,
+    mrp: parseFloat((mrp * parseFloat(country.currencyValue || 1)).toFixed(2)),
+    price: parseFloat((price * parseFloat(country.currencyValue || 1)).toFixed(2))
+  }));
 };
 
 // Get products list with pagination and filters
@@ -120,8 +132,25 @@ const getProducts = async (req, res) => {
       return acc;
     }, {});
 
+    // Calculate currency conversions for all variants
+    const enrichedVariants = await Promise.all(
+      variants.map(async (variant) => ({
+        ...variant.toObject(),
+        currency: await calculateCurrencyConversions(variant.mrp, variant.price)
+      }))
+    );
+
+    const enrichedVariantsByProduct = enrichedVariants.reduce((acc, variant) => {
+      const key = String(variant.product);
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(variant);
+      return acc;
+    }, {});
+
     const enrichedProducts = products.map((product) => {
-      const productVariants = variantsByProduct[String(product._id)] || [];
+      const productVariants = enrichedVariantsByProduct[String(product._id)] || [];
       // const prices = productVariants.map(v => v.price);
       // const mrps = productVariants.map(v => v.mrp);
 
@@ -173,23 +202,26 @@ const getProductDetails = async (req, res) => {
       status: 'active'
     });
 
-    // Enrich product with variant data
+    // Enrich product with variant data and currency conversions
     const enrichedProduct = {
       ...product.toObject(),
-      variants: variants.map(v => ({
-        _id: v._id,
-        nameEnglish: v.nameEnglish,
-        nameArabic: v.nameArabic,
-        shortDescriptionEnglish: v.shortDescriptionEnglish,
-        shortDescriptionArabic: v.shortDescriptionArabic,
-        imageUrlEnglish: v.imageUrlEnglish,
-        imageUrlArabic: v.imageUrlArabic,
-        color: v.color,
-        stock: v.stock,
-        price: v.price,
-        mrp: v.mrp,
-        discount: v.mrp ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0
-      })),
+      variants: await Promise.all(
+        variants.map(async (v) => ({
+          _id: v._id,
+          nameEnglish: v.nameEnglish,
+          nameArabic: v.nameArabic,
+          shortDescriptionEnglish: v.shortDescriptionEnglish,
+          shortDescriptionArabic: v.shortDescriptionArabic,
+          imageUrlEnglish: v.imageUrlEnglish,
+          imageUrlArabic: v.imageUrlArabic,
+          color: v.color,
+          stock: v.stock,
+          price: v.price,
+          mrp: v.mrp,
+          discount: v.mrp ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0,
+          currency: await calculateCurrencyConversions(v.mrp, v.price)
+        }))
+      ),
       minPrice: variants.length > 0 ? Math.min(...variants.map(v => v.price)) : null,
       maxPrice: variants.length > 0 ? Math.max(...variants.map(v => v.mrp)) : null,
       totalStock: variants.reduce((sum, v) => sum + v.stock, 0),
@@ -210,7 +242,7 @@ const getProductDetails = async (req, res) => {
       .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
       .limit(8);
 
-    // Enrich similar products with variant data
+    // Enrich similar products with variant data and currency conversions
     const enrichedSimilarProducts = await Promise.all(
       similarProducts.map(async (p) => {
         const pVariants = await ProductVariants.find({
@@ -220,16 +252,19 @@ const getProductDetails = async (req, res) => {
 
         return {
           ...p.toObject(),
-          variants: pVariants.map(v => ({
-            _id: v._id,
-            nameEnglish: v.nameEnglish,
-            nameArabic: v.nameArabic,
-            color: v.color,
-            stock: v.stock,
-            price: v.price,
-            mrp: v.mrp,
-            discount: v.mrp ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0
-          })),
+          variants: await Promise.all(
+            pVariants.map(async (v) => ({
+              _id: v._id,
+              nameEnglish: v.nameEnglish,
+              nameArabic: v.nameArabic,
+              color: v.color,
+              stock: v.stock,
+              price: v.price,
+              mrp: v.mrp,
+              discount: v.mrp ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0,
+              currency: await calculateCurrencyConversions(v.mrp, v.price)
+            }))
+          ),
           minPrice: pVariants.length > 0 ? Math.min(...pVariants.map(v => v.price)) : null,
           maxPrice: pVariants.length > 0 ? Math.max(...pVariants.map(v => v.mrp)) : null,
           totalStock: pVariants.reduce((sum, v) => sum + v.stock, 0)

@@ -5,6 +5,18 @@ const Brand = require('../../model/brandModel');
 const Product = require('../../model/productModel');
 const ProductVariants = require('../../model/productVariantsModel');
 const Influencer = require('../../model/influencerModel');
+const Country = require('../../model/countryModel');
+
+// Helper function to calculate currency conversions for all active countries
+const calculateCurrencyConversions = async (mrp, price) => {
+  const activeCountries = await Country.find({ status: 'active' });
+  
+  return activeCountries.map(country => ({
+    country: country.nameEnglish || country.nameArabic,
+    mrp: parseFloat((mrp * parseFloat(country.currencyValue || 1)).toFixed(2)),
+    price: parseFloat((price * parseFloat(country.currencyValue || 1)).toFixed(2))
+  }));
+};
 
 const getHome = async (req, res) => {
   try {
@@ -47,15 +59,18 @@ const getHome = async (req, res) => {
 
         return {
           ...product.toObject(),
-          variants: variants.map(v => ({
-            _id: v._id,
-            nameEnglish: v.nameEnglish,
-            nameArabic: v.nameArabic,
-            color: v.color,
-            stock: v.stock,
-            price: v.price,
-            mrp: v.mrp
-          })),
+          variants: await Promise.all(
+            variants.map(async (v) => ({
+              _id: v._id,
+              nameEnglish: v.nameEnglish,
+              nameArabic: v.nameArabic,
+              color: v.color,
+              stock: v.stock,
+              price: v.price,
+              mrp: v.mrp,
+              currency: await calculateCurrencyConversions(v.mrp, v.price)
+            }))
+          ),
           minPrice: variants.length > 0 ? Math.min(...variants.map(v => v.price)) : null,
           maxPrice: variants.length > 0 ? Math.max(...variants.map(v => v.mrp)) : null,
           totalStock: variants.reduce((sum, v) => sum + v.stock, 0)
@@ -73,15 +88,18 @@ const getHome = async (req, res) => {
 
         return {
           ...product.toObject(),
-          variants: variants.map(v => ({
-            _id: v._id,
-            nameEnglish: v.nameEnglish,
-            nameArabic: v.nameArabic,
-            color: v.color,
-            stock: v.stock,
-            price: v.price,
-            mrp: v.mrp
-          })),
+          variants: await Promise.all(
+            variants.map(async (v) => ({
+              _id: v._id,
+              nameEnglish: v.nameEnglish,
+              nameArabic: v.nameArabic,
+              color: v.color,
+              stock: v.stock,
+              price: v.price,
+              mrp: v.mrp,
+              currency: await calculateCurrencyConversions(v.mrp, v.price)
+            }))
+          ),
           minPrice: variants.length > 0 ? Math.min(...variants.map(v => v.price)) : null,
           maxPrice: variants.length > 0 ? Math.max(...variants.map(v => v.mrp)) : null,
           totalStock: variants.reduce((sum, v) => sum + v.stock, 0)
