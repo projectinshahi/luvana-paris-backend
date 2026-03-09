@@ -87,8 +87,8 @@ const createProduct = async (req, res) => {
       shortDescriptionEnglish, 
       shortDescriptionArabic, 
       description, 
-      imageUrlEnglish, 
-      imageUrlArabic,
+      // imageUrlEnglish, 
+      // imageUrlArabic,
       isNew,
       isFeatured,
       status 
@@ -112,8 +112,8 @@ const createProduct = async (req, res) => {
       shortDescriptionEnglish,
       shortDescriptionArabic,
       description,
-      imageUrlEnglish: imageUrlEnglish || [],
-      imageUrlArabic: imageUrlArabic || [],
+      // imageUrlEnglish: imageUrlEnglish || [],
+      // imageUrlArabic: imageUrlArabic || [],
       isNew: isNew || false,
       isFeatured: isFeatured || false,
       status: status || 'active'
@@ -137,14 +137,14 @@ const updateProduct = async (req, res) => {
     const updates = req.body;
 
     // Validate imageUrlEnglish structure if provided
-    if (updates.imageUrlEnglish !== undefined && !Array.isArray(updates.imageUrlEnglish)) {
-      return res.status(400).json({ message: 'imageUrlEnglish must be an array' });
-    }
+    // if (updates.imageUrlEnglish !== undefined && !Array.isArray(updates.imageUrlEnglish)) {
+    //   return res.status(400).json({ message: 'imageUrlEnglish must be an array' });
+    // }
 
-    // Validate imageUrlArabic structure if provided
-    if (updates.imageUrlArabic !== undefined && !Array.isArray(updates.imageUrlArabic)) {
-      return res.status(400).json({ message: 'imageUrlArabic must be an array' });
-    }
+    // // Validate imageUrlArabic structure if provided
+    // if (updates.imageUrlArabic !== undefined && !Array.isArray(updates.imageUrlArabic)) {
+    //   return res.status(400).json({ message: 'imageUrlArabic must be an array' });
+    // }
 
     const updatedProduct = await Product.findByIdAndUpdate(id, updates, { new: true })
       .populate('category', 'nameEnglish nameArabic')

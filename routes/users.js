@@ -34,4 +34,7 @@ router.use('/promotion-strip', require('./user/promotionStripRoute'));
 // Influencer route
 router.use('/influencer', require('./user/influencerRoute'));
 
+// Country route
+router.use('/country', require('./user/countryRoute'));
+
 module.exports = router;

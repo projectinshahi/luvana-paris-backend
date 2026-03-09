@@ -44,7 +44,7 @@ const getHome = async (req, res) => {
 
     // Get active influencers sorted by sortOrder
     const influencers = await Influencer.find({ status: 'active' })
-      .populate('product', 'nameEnglish nameArabic imageUrlEnglish imageUrlArabic')
+      .populate('product', 'nameEnglish nameArabic')
       .populate('variant', 'nameEnglish nameArabic color price mrp imageUrlEnglish imageUrlArabic')
       .sort({ sortOrder: 1 })
       .select('titleEnglish titleArabic product variant videoUrl');
@@ -68,6 +68,8 @@ const getHome = async (req, res) => {
               stock: v.stock,
               price: v.price,
               mrp: v.mrp,
+              imageUrlEnglish: v.imageUrlEnglish,
+              imageUrlArabic: v.imageUrlArabic,
               currency: await calculateCurrencyConversions(v.mrp, v.price)
             }))
           ),
@@ -97,6 +99,8 @@ const getHome = async (req, res) => {
               stock: v.stock,
               price: v.price,
               mrp: v.mrp,
+              imageUrlEnglish: v.imageUrlEnglish,
+              imageUrlArabic: v.imageUrlArabic,
               currency: await calculateCurrencyConversions(v.mrp, v.price)
             }))
           ),
