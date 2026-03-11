@@ -261,6 +261,8 @@ const getProductDetails = async (req, res) => {
               stock: v.stock,
               price: v.price,
               mrp: v.mrp,
+              imageUrlEnglish: v.imageUrlEnglish,
+              imageUrlArabic: v.imageUrlArabic,
               discount: v.mrp ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0,
               currency: await calculateCurrencyConversions(v.mrp, v.price)
             }))
