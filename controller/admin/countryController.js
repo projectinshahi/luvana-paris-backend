@@ -34,6 +34,7 @@ const createCountry = async (req, res) => {
     const {
       nameEnglish,
       nameArabic,
+      abbreviation,
       flagUrl,
       publicId,
       currencyValue,
@@ -43,6 +44,7 @@ const createCountry = async (req, res) => {
     const newCountry = new Country({
       nameEnglish,
       nameArabic,
+      abbreviation,
       flagUrl,
       publicId,
       currencyValue,

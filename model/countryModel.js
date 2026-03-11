@@ -6,6 +6,7 @@ const countrySchema = new mongoose.Schema({
     flagUrl: String,
     publicId: String,
     currencyValue: String,
+    abbreviation: String,
     status: {
       type: String,
       enum: ['active', 'inactive'],

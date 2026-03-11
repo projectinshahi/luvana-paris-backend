@@ -4,7 +4,7 @@ const Country = require('../../model/countryModel');
 const getCountries = async (req, res) => {
   try {
     const countries = await Country.find({ status: 'active' })
-      .select('nameEnglish nameArabic flagUrl currencyValue')
+      .select('nameEnglish nameArabic abbreviation flagUrl currencyValue')
       .sort({ nameEnglish: 1 });
 
     res.json({
