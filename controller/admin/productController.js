@@ -1,5 +1,16 @@
 const Product = require('../../model/productModel');
 
+const parseBoolean = (value, defaultValue = undefined) => {
+  if (value === undefined) return defaultValue;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+  }
+  return Boolean(value);
+};
+
 // Get all products with filters
 const getAllProducts = async (req, res) => {
   try {
@@ -91,18 +102,19 @@ const createProduct = async (req, res) => {
       // imageUrlArabic,
       isNew,
       isFeatured,
+      hasVariants,
       status 
     } = req.body;
 
     // Validate imageUrlEnglish structure
-    if (imageUrlEnglish && !Array.isArray(imageUrlEnglish)) {
-      return res.status(400).json({ message: 'imageUrlEnglish must be an array' });
-    }
+    // if (imageUrlEnglish && !Array.isArray(imageUrlEnglish)) {
+    //   return res.status(400).json({ message: 'imageUrlEnglish must be an array' });
+    // }
 
-    // Validate imageUrlArabic structure
-    if (imageUrlArabic && !Array.isArray(imageUrlArabic)) {
-      return res.status(400).json({ message: 'imageUrlArabic must be an array' });
-    }
+    // // Validate imageUrlArabic structure
+    // if (imageUrlArabic && !Array.isArray(imageUrlArabic)) {
+    //   return res.status(400).json({ message: 'imageUrlArabic must be an array' });
+    // }
 
     const newProduct = new Product({
       category,
@@ -114,8 +126,9 @@ const createProduct = async (req, res) => {
       description,
       // imageUrlEnglish: imageUrlEnglish || [],
       // imageUrlArabic: imageUrlArabic || [],
-      isNew: isNew || false,
-      isFeatured: isFeatured || false,
+      isNew: parseBoolean(isNew, false),
+      isFeatured: parseBoolean(isFeatured, false),
+      hasVariants: parseBoolean(hasVariants, false),
       status: status || 'active'
     });
 
@@ -134,7 +147,11 @@ const createProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const updates = { ...req.body };
+
+    if (updates.hasVariants !== undefined) {
+      updates.hasVariants = parseBoolean(updates.hasVariants);
+    }
 
     // Validate imageUrlEnglish structure if provided
     // if (updates.imageUrlEnglish !== undefined && !Array.isArray(updates.imageUrlEnglish)) {
