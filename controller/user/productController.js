@@ -121,7 +121,7 @@ const getProducts = async (req, res) => {
     const variants = await ProductVariants.find({
       product: { $in: productIds },
       status: 'active'
-    }).select('product nameEnglish nameArabic color stock price mrp');
+    }).select('product nameEnglish nameArabic color stock price mrp imageUrlEnglish imageUrlArabic');
 
     const variantsByProduct = variants.reduce((acc, variant) => {
       const key = String(variant.product);
