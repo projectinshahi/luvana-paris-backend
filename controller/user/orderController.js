@@ -160,7 +160,7 @@ const createOrder = async (req, res) => {
       discount: itemDiscountTotal + couponDiscount,
       shippingCharges: Number(shippingCharges || 0),
       status: 'pending',
-      paymentStatus: 'pending',
+      paymentStatus: 'paid', //'pending',
       orderItem: normalizedItems
     });
 
