@@ -29,7 +29,7 @@ const getBannerById = async (req, res) => {
 // Create new banner
 const createBanner = async (req, res) => {
   try {
-    const { name, titleEnglish, titleArabic, descriptionEnglish, descriptionArabic, imageUrlEnglish, imageUrlArabic, sortOrder, status } = req.body;
+    const { name, titleEnglish, titleArabic, descriptionEnglish, descriptionArabic, imageUrlEnglish, imageMobileUrlEnglish, imageUrlArabic, imageMobileUrlArabic, sortOrder, status } = req.body;
 
     const newBanner = new Banner({
       name,
@@ -38,7 +38,9 @@ const createBanner = async (req, res) => {
       descriptionEnglish,
       descriptionArabic,
       imageUrlEnglish,
+      imageMobileUrlEnglish,
       imageUrlArabic,
+      imageMobileUrlArabic,
       sortOrder,
       status: status || 'active'
     });
