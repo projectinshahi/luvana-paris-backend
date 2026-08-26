@@ -10,9 +10,13 @@ const brandSchema = new mongoose.Schema({
     logoPublicIdEnglish: String,
     logoPublicIdArabic: String,
     brandImageEnglish: String,
+    brandMobileImageEnglish: String,
     brandImageArabic: String,
+    brandMobileImageArabic: String,
     brandImagePublicIdEnglish: String,
+    brandMobileImagePublicIdEnglish: String,
     brandImagePublicIdArabic: String,
+    brandMobileImagePublicIdArabic: String,
     status: {
       type: String,
       enum: ['active', 'inactive'],

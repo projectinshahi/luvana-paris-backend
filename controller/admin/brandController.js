@@ -39,9 +39,13 @@ const createBrand = async (req, res) => {
       logoPublicIdEnglish,
       logoPublicIdArabic,
       brandImageEnglish,
+      brandMobileImageEnglish,
       brandImageArabic,
+      brandMobileImageArabic,
       brandImagePublicIdEnglish,
+      brandMobileImagePublicIdEnglish,
       brandImagePublicIdArabic,
+      brandMobileImagePublicIdArabic,
       status 
     } = req.body;
 
@@ -55,9 +59,13 @@ const createBrand = async (req, res) => {
       logoPublicIdEnglish,
       logoPublicIdArabic,
       brandImageEnglish,
+      brandMobileImageEnglish,
       brandImageArabic,
+      brandMobileImageArabic,
       brandImagePublicIdEnglish,
+      brandMobileImagePublicIdEnglish,
       brandImagePublicIdArabic,
+      brandMobileImagePublicIdArabic,
       status: status || 'active'
     });
 
