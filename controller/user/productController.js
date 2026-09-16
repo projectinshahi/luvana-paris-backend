@@ -1,6 +1,6 @@
 const Product = require('../../model/productModel');
 const ProductVariants = require('../../model/productVariantsModel');
-const Country = require('../../model/countryModel');
+const { loadCurrencyConverter } = require('./currencyConversions');
 
 const parseMultiFilterValues = (value) => {
   const sanitizeToken = (token) => String(token)
@@ -29,16 +29,6 @@ const parseMultiFilterValues = (value) => {
   return [];
 };
 
-// Helper function to calculate currency conversions for all active countries
-const calculateCurrencyConversions = async (mrp, price) => {
-  const activeCountries = await Country.find({ status: 'active' });
-  
-  return activeCountries.map(country => ({
-    country: country.nameEnglish || country.nameArabic,
-    mrp: parseFloat((mrp * parseFloat(country.currencyValue || 1)).toFixed(2)),
-    price: parseFloat((price * parseFloat(country.currencyValue || 1)).toFixed(2))
-  }));
-};
 
 // Get products list with pagination and filters
 const getProducts = async (req, res) => {
@@ -107,15 +97,18 @@ const getProducts = async (req, res) => {
       productQuery._id = { $in: productIds };
     }
 
-    const totalItems = await Product.countDocuments(productQuery);
+    // Independent reads run together instead of one after another.
+    const [totalItems, products, convert] = await Promise.all([
+      Product.countDocuments(productQuery),
+      Product.find(productQuery)
+        .populate('category', 'nameEnglish nameArabic')
+        .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
+        .sort({ createdAt: -1 })
+        .skip((pageNumber - 1) * limitNumber)
+        .limit(limitNumber),
+      loadCurrencyConverter()
+    ]);
     const totalPages = Math.ceil(totalItems / limitNumber);
-
-    const products = await Product.find(productQuery)
-      .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
-      .sort({ createdAt: -1 })
-      .skip((pageNumber - 1) * limitNumber)
-      .limit(limitNumber);
 
     const productIds = products.map(p => p._id);
     const variants = await ProductVariants.find({
@@ -133,12 +126,10 @@ const getProducts = async (req, res) => {
     }, {});
 
     // Calculate currency conversions for all variants
-    const enrichedVariants = await Promise.all(
-      variants.map(async (variant) => ({
-        ...variant.toObject(),
-        currency: await calculateCurrencyConversions(variant.mrp, variant.price)
-      }))
-    );
+    const enrichedVariants = variants.map((variant) => ({
+      ...variant.toObject(),
+      currency: convert(variant.mrp, variant.price)
+    }));
 
     const enrichedVariantsByProduct = enrichedVariants.reduce((acc, variant) => {
       const key = String(variant.product);
@@ -196,32 +187,41 @@ const getProductDetails = async (req, res) => {
       return res.status(404).json({ message: 'Product not available' });
     }
 
-    // Get all variants for this product
-    const variants = await ProductVariants.find({
-      product: product._id,
-      status: 'active'
-    });
+    // Variants, similar products and the currency list are independent reads.
+    const [variants, similarProducts, convert] = await Promise.all([
+      ProductVariants.find({
+        product: product._id,
+        status: 'active'
+      }),
+      Product.find({
+        _id: { $ne: product._id },
+        category: product.category._id,
+        status: 'active'
+      })
+        .populate('category', 'nameEnglish nameArabic')
+        .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
+        .limit(8),
+      loadCurrencyConverter()
+    ]);
 
     // Enrich product with variant data and currency conversions
     const enrichedProduct = {
       ...product.toObject(),
-      variants: await Promise.all(
-        variants.map(async (v) => ({
-          _id: v._id,
-          nameEnglish: v.nameEnglish,
-          nameArabic: v.nameArabic,
-          shortDescriptionEnglish: v.shortDescriptionEnglish,
-          shortDescriptionArabic: v.shortDescriptionArabic,
-          imageUrlEnglish: v.imageUrlEnglish,
-          imageUrlArabic: v.imageUrlArabic,
-          color: v.color,
-          stock: v.stock,
-          price: v.price,
-          mrp: v.mrp,
-          discount: v.mrp ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0,
-          currency: await calculateCurrencyConversions(v.mrp, v.price)
-        }))
-      ),
+      variants: variants.map((v) => ({
+        _id: v._id,
+        nameEnglish: v.nameEnglish,
+        nameArabic: v.nameArabic,
+        shortDescriptionEnglish: v.shortDescriptionEnglish,
+        shortDescriptionArabic: v.shortDescriptionArabic,
+        imageUrlEnglish: v.imageUrlEnglish,
+        imageUrlArabic: v.imageUrlArabic,
+        color: v.color,
+        stock: v.stock,
+        price: v.price,
+        mrp: v.mrp,
+        discount: v.mrp ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0,
+        currency: convert(v.mrp, v.price)
+      })),
       minPrice: variants.length > 0 ? Math.min(...variants.map(v => v.price)) : null,
       maxPrice: variants.length > 0 ? Math.max(...variants.map(v => v.mrp)) : null,
       totalStock: variants.reduce((sum, v) => sum + v.stock, 0),
@@ -232,28 +232,25 @@ const getProductDetails = async (req, res) => {
         : 0
     };
 
-    // Get similar products from same category
-    const similarProducts = await Product.find({
-      _id: { $ne: product._id },
-      category: product.category._id,
+    // Variants for all similar products in one query instead of one per product
+    const similarVariants = await ProductVariants.find({
+      product: { $in: similarProducts.map((p) => p._id) },
       status: 'active'
-    })
-      .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
-      .limit(8);
+    });
+    const similarVariantsByProduct = new Map();
+    for (const v of similarVariants) {
+      const key = String(v.product);
+      if (!similarVariantsByProduct.has(key)) similarVariantsByProduct.set(key, []);
+      similarVariantsByProduct.get(key).push(v);
+    }
 
     // Enrich similar products with variant data and currency conversions
-    const enrichedSimilarProducts = await Promise.all(
-      similarProducts.map(async (p) => {
-        const pVariants = await ProductVariants.find({
-          product: p._id,
-          status: 'active'
-        });
+    const enrichedSimilarProducts = similarProducts.map((p) => {
+        const pVariants = similarVariantsByProduct.get(String(p._id)) || [];
 
         return {
           ...p.toObject(),
-          variants: await Promise.all(
-            pVariants.map(async (v) => ({
+          variants: pVariants.map((v) => ({
               _id: v._id,
               nameEnglish: v.nameEnglish,
               nameArabic: v.nameArabic,
@@ -264,15 +261,13 @@ const getProductDetails = async (req, res) => {
               imageUrlEnglish: v.imageUrlEnglish,
               imageUrlArabic: v.imageUrlArabic,
               discount: v.mrp ? Math.round(((v.mrp - v.price) / v.mrp) * 100) : 0,
-              currency: await calculateCurrencyConversions(v.mrp, v.price)
-            }))
-          ),
+              currency: convert(v.mrp, v.price)
+            })),
           minPrice: pVariants.length > 0 ? Math.min(...pVariants.map(v => v.price)) : null,
           maxPrice: pVariants.length > 0 ? Math.max(...pVariants.map(v => v.mrp)) : null,
           totalStock: pVariants.reduce((sum, v) => sum + v.stock, 0)
         };
-      })
-    );
+      });
 
     res.json({
       product: enrichedProduct,

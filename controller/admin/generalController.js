@@ -1,11 +1,66 @@
 const cloudinary = require('cloudinary').v2;
-const fs = require('fs');
 
 // Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'df0jugmxr',
   api_key: process.env.CLOUDINARY_API_KEY || '876349442238177',
   api_secret: process.env.CLOUDINARY_API_SECRET || 'VIevf7rpePqh1deA1lZroa0xntI'
+});
+
+// Send an in-memory file straight to Cloudinary — no temp file on disk.
+const uploadBuffer = (buffer, folder) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: 'auto',
+        quality: 'auto',
+        fetch_format: 'auto'
+      },
+      (error, result) => (error ? reject(error) : resolve(result))
+    );
+    stream.end(buffer);
+  });
+
+// Identify an image by its leading bytes rather than by the MIME type the
+// browser attached — that label depends on the uploading machine's OS and is
+// blank or wrong for HEIC/AVIF/WebP on many installs. Covers every format
+// Cloudinary stores and, after its on-upload conversion, browsers can render.
+const SUPPORTED_FORMATS = 'JPEG, PNG, GIF, WebP, AVIF, HEIC/HEIF, BMP, TIFF or SVG';
+
+const detectImageFormat = (buf) => {
+  if (!buf || buf.length < 12) return null;
+  const hex = (n) => buf.subarray(0, n).toString('hex');
+  const ascii = (a, b) => buf.subarray(a, b).toString('latin1');
+
+  if (hex(3) === 'ffd8ff') return 'jpeg';
+  if (hex(8) === '89504e470d0a1a0a') return 'png';
+  if (ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a') return 'gif';
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'webp';
+  if (ascii(0, 2) === 'BM') return 'bmp';
+  if (hex(4) === '49492a00' || hex(4) === '4d4d002a') return 'tiff';
+  if (ascii(4, 8) === 'ftyp') {
+    const brand = ascii(8, 12);
+    if (/^avi[fs]/.test(brand)) return 'avif';
+    if (/^(hei[cxms]|hev[cx]|mif1|msf1)/.test(brand)) return 'heic';
+  }
+  // SVG is text: tolerate a BOM, XML prolog, comments or a doctype before <svg.
+  const head = buf.subarray(0, 1024).toString('utf8').replace(/^\uFEFF/, '').trimStart();
+  if (/^(<\?xml[\s\S]*?\?>\s*)?(<!--[\s\S]*?-->\s*)*(<!DOCTYPE[^>]*>\s*)?<svg[\s>]/i.test(head)) return 'svg';
+  return null;
+};
+
+const unsupportedFile = (name) => ({
+  message: `${name ? `"${name}" is not` : 'That file is not'} a supported image. Please upload ${SUPPORTED_FORMATS}.`
+});
+
+const toImagePayload = (result) => ({
+  url: result.secure_url,
+  publicId: result.public_id,
+  width: result.width,
+  height: result.height,
+  size: result.bytes,
+  format: result.format
 });
 
 // Upload image to Cloudinary
@@ -16,37 +71,20 @@ const uploadImage = async (req, res) => {
       return res.status(400).json({ message: 'No file provided' });
     }
 
+    if (!detectImageFormat(req.file.buffer)) {
+      return res.status(400).json(unsupportedFile(req.file.originalname));
+    }
+
     // Get optional folder parameter
     const { folder = 'luvana' } = req.query;
 
-    // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: folder,
-      resource_type: 'auto',
-      quality: 'auto',
-      fetch_format: 'auto'
-    });
-
-    // Delete the temporary file
-    fs.unlinkSync(req.file.path);
+    const result = await uploadBuffer(req.file.buffer, folder);
 
     res.json({
       message: 'Image uploaded successfully',
-      image: {
-        url: result.secure_url,
-        publicId: result.public_id,
-        width: result.width,
-        height: result.height,
-        size: result.bytes,
-        format: result.format
-      }
+      image: toImagePayload(result)
     });
   } catch (error) {
-    // Delete the temporary file if it exists
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-
     console.error('Image upload error:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
@@ -59,56 +97,23 @@ const uploadMultipleImages = async (req, res) => {
       return res.status(400).json({ message: 'No files provided' });
     }
 
+    const rejected = req.files.find(file => !detectImageFormat(file.buffer));
+    if (rejected) {
+      return res.status(400).json(unsupportedFile(rejected.originalname));
+    }
+
     const { folder = 'luvana' } = req.query;
-    const uploadedImages = [];
 
     // Upload all files in parallel
-    const uploadPromises = req.files.map(file =>
-      cloudinary.uploader.upload(file.path, {
-        folder: folder,
-        resource_type: 'auto',
-        quality: 'auto',
-        fetch_format: 'auto'
-      })
-        .then(result => {
-          // Delete temporary file
-          if (fs.existsSync(file.path)) {
-            fs.unlinkSync(file.path);
-          }
-          return {
-            url: result.secure_url,
-            publicId: result.public_id,
-            width: result.width,
-            height: result.height,
-            size: result.bytes,
-            format: result.format
-          };
-        })
-        .catch(err => {
-          // Delete temporary file on error
-          if (fs.existsSync(file.path)) {
-            fs.unlinkSync(file.path);
-          }
-          throw err;
-        })
+    const images = await Promise.all(
+      req.files.map(file => uploadBuffer(file.buffer, folder).then(toImagePayload))
     );
-
-    const images = await Promise.all(uploadPromises);
 
     res.json({
       message: `${images.length} images uploaded successfully`,
       images
     });
   } catch (error) {
-    // Clean up remaining files
-    if (req.files) {
-      req.files.forEach(file => {
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
-        }
-      });
-    }
-
     console.error('Multiple image upload error:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
@@ -139,5 +144,6 @@ const deleteImage = async (req, res) => {
 module.exports = {
   uploadImage,
   uploadMultipleImages,
-  deleteImage
+  deleteImage,
+  detectImageFormat
 };

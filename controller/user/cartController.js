@@ -1,18 +1,8 @@
 const Cart = require('../../model/cartModel');
 const ProductVariants = require('../../model/productVariantsModel');
 const Coupon = require('../../model/couponModel');
-const Country = require('../../model/countryModel');
+const { loadCurrencyConverter } = require('./currencyConversions');
 
-// Helper function to calculate currency conversions for all active countries
-const calculateCurrencyConversions = async (mrp, price) => {
-  const activeCountries = await Country.find({ status: 'active' });
-  
-  return activeCountries.map(country => ({
-    country: country.nameEnglish || country.nameArabic,
-    mrp: parseFloat((mrp * parseFloat(country.currencyValue || 1)).toFixed(2)),
-    price: parseFloat((price * parseFloat(country.currencyValue || 1)).toFixed(2))
-  }));
-};
 
 // Add to cart
 const addToCart = async (req, res) => {
@@ -99,6 +89,8 @@ const getCart = async (req, res) => {
       });
     }
 
+    const convert = await loadCurrencyConverter();
+
     // Calculate prices for each item
     const enrichedItems = await Promise.all(
       cartItems.map(async (item) => {
@@ -119,7 +111,7 @@ const getCart = async (req, res) => {
             mrp: variant.mrp,
             imageUrlEnglish: variant.imageUrlEnglish,
             imageUrlArabic: variant.imageUrlArabic,
-            currency: await calculateCurrencyConversions(variant.mrp, variant.price)
+            currency: convert(variant.mrp, variant.price)
           },
           quantity: item.quantity,
           itemPrice,
