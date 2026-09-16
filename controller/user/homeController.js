@@ -5,118 +5,82 @@ const Brand = require('../../model/brandModel');
 const Product = require('../../model/productModel');
 const ProductVariants = require('../../model/productVariantsModel');
 const Influencer = require('../../model/influencerModel');
-const Country = require('../../model/countryModel');
+const { loadCurrencyConverter } = require('./currencyConversions');
 
-// Helper function to calculate currency conversions for all active countries
-const calculateCurrencyConversions = async (mrp, price) => {
-  const activeCountries = await Country.find({ status: 'active' });
-  
-  return activeCountries.map(country => ({
-    country: country.nameEnglish || country.nameArabic,
-    mrp: parseFloat((mrp * parseFloat(country.currencyValue || 1)).toFixed(2)),
-    price: parseFloat((price * parseFloat(country.currencyValue || 1)).toFixed(2))
-  }));
-};
+const BRAND_FIELDS = 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic';
 
 const getHome = async (req, res) => {
   try {
-    // Get active banners sorted by sortOrder
-    const banners = await Banner.find({ status: 'active' }).sort({ sortOrder: 1 }).limit(10);
+    // Independent reads run together. Each database round-trip costs ~55 ms and
+    // these used to run one after another (32 queries in all for this endpoint).
+    const [banners, categories, brands, newProducts, featuredProducts, influencers, convert] = await Promise.all([
+      // Active banners sorted by sortOrder
+      Banner.find({ status: 'active' }).sort({ sortOrder: 1 }).limit(10),
+      // Active categories
+      Category.find({ status: 'active' }).limit(10),
+      // Active brands
+      Brand.find({ status: 'active' }).limit(10),
+      // New products (latest 10)
+      Product.find({ status: 'active', isNew: true })
+        .populate('category', 'nameEnglish nameArabic')
+        .populate('brand', BRAND_FIELDS)
+        .sort({ createdAt: -1 })
+        .limit(10),
+      // Featured products
+      Product.find({ status: 'active', isFeatured: true })
+        .populate('category', 'nameEnglish nameArabic')
+        .populate('brand', BRAND_FIELDS)
+        .limit(10),
+      // Active influencers sorted by sortOrder
+      Influencer.find({ status: 'active' })
+        .populate('product', 'nameEnglish nameArabic')
+        .populate('variant', 'nameEnglish nameArabic color price mrp imageUrlEnglish imageUrlArabic')
+        .sort({ sortOrder: 1 })
+        .select('titleEnglish titleArabic product variant videoUrl'),
+      loadCurrencyConverter()
+    ]);
 
-    // Get active categories
-    const categories = await Category.find({ status: 'active' }).limit(10);
-
-    // Get active brands
-    const brands = await Brand.find({ status: 'active' }).limit(10);
-
-    // Get new products (latest 10)
-    const newProducts = await Product.find({ status: 'active', isNew: true })
-      .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
-      .sort({ createdAt: -1 })
-      .limit(10);
-
-    // Get featured products with variants and pricing
-    const featuredProducts = await Product.find({ status: 'active', isFeatured: true })
-      .populate('category', 'nameEnglish nameArabic')
-      .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
-      .limit(10);
-
-    // Get active influencers sorted by sortOrder
-    const influencers = await Influencer.find({ status: 'active' })
-      .populate('product', 'nameEnglish nameArabic')
-      .populate('variant', 'nameEnglish nameArabic color price mrp imageUrlEnglish imageUrlArabic')
-      .sort({ sortOrder: 1 })
-      .select('titleEnglish titleArabic product variant videoUrl');
+    // Variants for every listed product in one query instead of one per product
+    const variants = await ProductVariants.find({
+      product: { $in: [...featuredProducts, ...newProducts].map((product) => product._id) },
+      status: 'active'
+    });
+    const variantsByProduct = new Map();
+    for (const variant of variants) {
+      const key = String(variant.product);
+      if (!variantsByProduct.has(key)) variantsByProduct.set(key, []);
+      variantsByProduct.get(key).push(variant);
+    }
 
     // Enrich products with variant data (price, stock, etc.)
-    const enrichedFeaturedProducts = await Promise.all(
-      featuredProducts.map(async (product) => {
-        const variants = await ProductVariants.find({
-          product: product._id,
-          status: 'active'
-        });
-
-        return {
-          ...product.toObject(),
-          variants: await Promise.all(
-            variants.map(async (v) => ({
-              _id: v._id,
-              nameEnglish: v.nameEnglish,
-              nameArabic: v.nameArabic,
-              color: v.color,
-              stock: v.stock,
-              price: v.price,
-              mrp: v.mrp,
-              imageUrlEnglish: v.imageUrlEnglish,
-              imageUrlArabic: v.imageUrlArabic,
-              currency: await calculateCurrencyConversions(v.mrp, v.price)
-            }))
-          ),
-          minPrice: variants.length > 0 ? Math.min(...variants.map(v => v.price)) : null,
-          maxPrice: variants.length > 0 ? Math.max(...variants.map(v => v.mrp)) : null,
-          totalStock: variants.reduce((sum, v) => sum + v.stock, 0)
-        };
-      })
-    );
-
-    // Enrich new products with variant data
-    const enrichedNewProducts = await Promise.all(
-      newProducts.map(async (product) => {
-        const variants = await ProductVariants.find({
-          product: product._id,
-          status: 'active'
-        });
-
-        return {
-          ...product.toObject(),
-          variants: await Promise.all(
-            variants.map(async (v) => ({
-              _id: v._id,
-              nameEnglish: v.nameEnglish,
-              nameArabic: v.nameArabic,
-              color: v.color,
-              stock: v.stock,
-              price: v.price,
-              mrp: v.mrp,
-              imageUrlEnglish: v.imageUrlEnglish,
-              imageUrlArabic: v.imageUrlArabic,
-              currency: await calculateCurrencyConversions(v.mrp, v.price)
-            }))
-          ),
-          minPrice: variants.length > 0 ? Math.min(...variants.map(v => v.price)) : null,
-          maxPrice: variants.length > 0 ? Math.max(...variants.map(v => v.mrp)) : null,
-          totalStock: variants.reduce((sum, v) => sum + v.stock, 0)
-        };
-      })
-    );
+    const enrich = (product) => {
+      const productVariants = variantsByProduct.get(String(product._id)) || [];
+      return {
+        ...product.toObject(),
+        variants: productVariants.map((v) => ({
+          _id: v._id,
+          nameEnglish: v.nameEnglish,
+          nameArabic: v.nameArabic,
+          color: v.color,
+          stock: v.stock,
+          price: v.price,
+          mrp: v.mrp,
+          imageUrlEnglish: v.imageUrlEnglish,
+          imageUrlArabic: v.imageUrlArabic,
+          currency: convert(v.mrp, v.price)
+        })),
+        minPrice: productVariants.length > 0 ? Math.min(...productVariants.map(v => v.price)) : null,
+        maxPrice: productVariants.length > 0 ? Math.max(...productVariants.map(v => v.mrp)) : null,
+        totalStock: productVariants.reduce((sum, v) => sum + v.stock, 0)
+      };
+    };
 
     res.json({
       banners,
       categories,
       brands,
-      newProducts: enrichedNewProducts,
-      featuredProducts: enrichedFeaturedProducts,
+      newProducts: newProducts.map(enrich),
+      featuredProducts: featuredProducts.map(enrich),
       influencers
     });
   } catch (error) {

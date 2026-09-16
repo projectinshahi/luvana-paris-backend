@@ -4,18 +4,8 @@ const Coupon = require('../../model/couponModel');
 const UserAddress = require('../../model/userAddressModel');
 const Product = require('../../model/productModel');
 const ProductVariants = require('../../model/productVariantsModel');
-const Country = require('../../model/countryModel');
+const { loadCurrencyConverter } = require('./currencyConversions');
 
-// Helper function to calculate currency conversions for all active countries
-const calculateCurrencyConversions = async (mrp, price) => {
-  const activeCountries = await Country.find({ status: 'active' });
-  
-  return activeCountries.map(country => ({
-    country: country.nameEnglish || country.nameArabic,
-    mrp: parseFloat((mrp * parseFloat(country.currencyValue || 1)).toFixed(2)),
-    price: parseFloat((price * parseFloat(country.currencyValue || 1)).toFixed(2))
-  }));
-};
 
 const generateOrderId = () => {
   const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -192,6 +182,7 @@ const getOrders = async (req, res) => {
       .populate('orderItem.product', 'nameEnglish nameArabic')
       .populate('orderItem.variant', 'nameEnglish nameArabic size color price mrp stock imageUrlEnglish imageUrlArabic')
       .sort({ createdAt: -1 });
+    const convert = await loadCurrencyConverter();
 
     // Enrich orders with currency conversions for variant data
     const enrichedOrders = await Promise.all(
@@ -201,10 +192,7 @@ const getOrders = async (req, res) => {
           orderObj.orderItem = await Promise.all(
             orderObj.orderItem.map(async (item) => {
               if (item.variant && item.variant.price !== undefined && item.variant.mrp !== undefined) {
-                item.variant.currency = await calculateCurrencyConversions(
-                  item.variant.mrp,
-                  item.variant.price
-                );
+                item.variant.currency = convert(item.variant.mrp, item.variant.price);
               }
               return item;
             })
