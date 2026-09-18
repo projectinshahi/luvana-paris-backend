@@ -103,7 +103,9 @@ const getProducts = async (req, res) => {
       Product.find(productQuery)
         .populate('category', 'nameEnglish nameArabic')
         .populate('brand', 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic')
-        .sort({ createdAt: -1 })
+        // _id breaks createdAt ties; see the admin listing. Paging over an
+        // unstable sort skips and duplicates products.
+        .sort({ createdAt: -1, _id: -1 })
         .skip((pageNumber - 1) * limitNumber)
         .limit(limitNumber),
       loadCurrencyConverter()

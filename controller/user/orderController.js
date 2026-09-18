@@ -87,12 +87,12 @@ const createOrder = async (req, res) => {
         return null;
       }
 
-      const productImageEnglish = Array.isArray(product.imageUrlEnglish) && product.imageUrlEnglish[0]
-        ? product.imageUrlEnglish[0].imageUrl
-        : undefined;
-      const productImageArabic = Array.isArray(product.imageUrlArabic) && product.imageUrlArabic[0]
-        ? product.imageUrlArabic[0].imageUrl
-        : undefined;
+      // Product photos are stored on the variant (the product-level lists are normally
+      // empty), so the order snapshot takes the variant's first image, then the product's.
+      const firstImage = (...lists) =>
+        lists.map((list) => Array.isArray(list) && list[0] && list[0].imageUrl).find(Boolean) || undefined;
+      const productImageEnglish = firstImage(variant.imageUrlEnglish, product.imageUrlEnglish);
+      const productImageArabic = firstImage(variant.imageUrlArabic, product.imageUrlArabic, variant.imageUrlEnglish, product.imageUrlEnglish);
 
       const linePrice = variant.price * quantity;
       const lineDiscount = variant.mrp ? (variant.mrp - variant.price) * quantity : 0;

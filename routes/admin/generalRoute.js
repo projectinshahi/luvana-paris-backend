@@ -4,7 +4,7 @@ const multer = require('multer');
 const generalController = require('../../controller/admin/generalController');
 const adminAuthMiddleware = require('../../middleware/adminAuthMiddleware');
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB, matched by the admin panel's own check
 
 // Files are held in memory and streamed straight to Cloudinary. Writing them to
 // disk first needed an ./uploads directory that was never created (every upload
@@ -34,7 +34,7 @@ router.use((req, res, next) => {
   const declared = Number(req.headers['content-length']);
   if (req.method === 'POST' && declared > MAX_FILE_SIZE * 1.05) {
     return res.status(413).json({
-      message: `File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)} MB.`
+      message: `Image size must not exceed ${MAX_FILE_SIZE / (1024 * 1024)}MB.`
     });
   }
   next();
@@ -59,7 +59,7 @@ router.use((err, req, res, next) => {
     const tooLarge = err.code === 'LIMIT_FILE_SIZE';
     return res.status(tooLarge ? 413 : 400).json({
       message: tooLarge
-        ? `File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)} MB.`
+        ? `Image size must not exceed ${MAX_FILE_SIZE / (1024 * 1024)}MB.`
         : err.message
     });
   }

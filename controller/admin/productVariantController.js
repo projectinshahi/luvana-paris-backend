@@ -114,8 +114,15 @@ const updateProductVariant = async (req, res) => {
       return res.status(400).json({ message: 'MRP must be a positive number' });
     }
 
-    if ((updates.price !== undefined || updates.mrp !== undefined) && updates.price > updates.mrp) {
-      return res.status(400).json({ message: 'Price cannot be greater than MRP' });
+    // Compare against the stored value when only one of the two is being changed
+    if (updates.price !== undefined || updates.mrp !== undefined) {
+      const current = await ProductVariants.findById(id).select('price mrp');
+      if (!current) {
+        return res.status(404).json({ message: 'Product variant not found' });
+      }
+      if ((updates.price ?? current.price) > (updates.mrp ?? current.mrp)) {
+        return res.status(400).json({ message: 'Price cannot be greater than MRP' });
+      }
     }
 
     // Ensure imageUrlEnglish and imageUrlArabic are arrays if provided
