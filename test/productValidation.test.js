@@ -29,7 +29,7 @@ test('a complete create passes, with numeric strings coerced and unknown keys dr
 test('an empty create reports every required field at once', () => {
   assert.deepEqual(errorsOf(validateCreateProduct({})), [
     'brand', 'category', 'description', 'nameArabic', 'nameEnglish',
-    'shortDescriptionArabic', 'shortDescriptionEnglish', 'variant'
+    'shortDescriptionArabic', 'shortDescriptionEnglish', 'variants'
   ]);
 });
 
@@ -47,7 +47,7 @@ test('at least one description section is required on create', () => {
 });
 
 test('every product details field is required on create', () => {
-  assert.deepEqual(errorsOf(validateCreateProduct(without('variant'))), ['variant']);
+  assert.deepEqual(errorsOf(validateCreateProduct(without('variant'))), ['variants']);
   for (const [field, bad] of [['color', undefined], ['color', ''], ['color', 'red'], ['price', undefined], ['mrp', undefined], ['stock', undefined]]) {
     const v = variant(); v[field] = bad;
     if (bad === undefined) delete v[field];
@@ -104,8 +104,6 @@ test('a multi-variant product needs at least one variant', () => {
 });
 
 test('every variant is validated, and errors name the variant that failed', () => {
-  assert.deepEqual(errorsOf(validateCreateProduct(multi([namedVariant({ nameEnglish: '' })]))), ['variants.0.nameEnglish']);
-  assert.deepEqual(errorsOf(validateCreateProduct(multi([namedVariant({ nameArabic: '  ' })]))), ['variants.0.nameArabic']);
   // The second variant reports under its own index, so the form highlights the right row.
   assert.deepEqual(errorsOf(validateCreateProduct(multi([namedVariant(), namedVariant({ price: 0 })]))), ['variants.1.price']);
   assert.deepEqual(errorsOf(validateCreateProduct(multi([namedVariant(), namedVariant({ stock: -1 })]))), ['variants.1.stock']);
@@ -118,8 +116,8 @@ test('every variant is validated, and errors name the variant that failed', () =
   // A broken actual price points at itself, not at the selling price.
   assert.deepEqual(errorsOf(validateCreateProduct(multi([namedVariant({ mrp: -1 })]))), ['variants.0.mrp']);
   // Several bad variants all report at once.
-  assert.deepEqual(errorsOf(validateCreateProduct(multi([namedVariant({ price: 0 }), namedVariant({ nameEnglish: '' })]))),
-    ['variants.0.price', 'variants.1.nameEnglish']);
+  assert.deepEqual(errorsOf(validateCreateProduct(multi([namedVariant({ price: 0 }), namedVariant({ stock: -1 })]))),
+    ['variants.0.price', 'variants.1.stock']);
 });
 
 // A section is optional on edit, but one that was added must say something —
@@ -173,4 +171,71 @@ test('editing keeps the looser rules so saved products stay editable', () => {
   assert.deepEqual(errorsOf(validateUpdateProduct({ variant: { ...noColourNoArabic, price: -1 } })), ['variant.price']);
   assert.deepEqual(errorsOf(validateUpdateProduct({ variant: { ...noColourNoArabic, imageUrlEnglish: [] } })), ['variant.imageUrlEnglish']);
   assert.deepEqual(errorsOf(validateUpdateProduct({ description: [section({ titleEnglish: '' })] })), ['description.0.titleEnglish']);
+});
+
+// Editing a multi-variant product sends the whole list back, under looser rules
+// than create: variants saved earlier may hold a CSS colour name or no Arabic
+// images, and requiring either would lock those products out of editing.
+test('editing accepts the whole variant list, including saved shapes create would refuse', () => {
+  const saved = (extra = {}) => namedVariant({ _id: id, ...extra });
+  assert.equal(validateUpdateProduct({ hasVariants: true, variants: [saved()] }).error, undefined);
+  // a colour name rather than a hex value
+  assert.equal(validateUpdateProduct({ hasVariants: true, variants: [saved({ color: 'Red' })] }).error, undefined);
+  assert.deepEqual(errorsOf(validateCreateProduct(multi([namedVariant({ color: 'Red' })]))), ['variants.0.color']);
+  // no Arabic images
+  assert.equal(validateUpdateProduct({ hasVariants: true, variants: [saved({ imageUrlArabic: [] })] }).error, undefined);
+  assert.deepEqual(errorsOf(validateCreateProduct(multi([namedVariant({ imageUrlArabic: [] })]))), ['variants.0.imageUrlArabic']);
+  // no colour at all
+  const noColour = saved(); delete noColour.color;
+  assert.equal(validateUpdateProduct({ hasVariants: true, variants: [noColour] }).error, undefined);
+});
+
+test('editing still rejects variants that are genuinely broken', () => {
+  const saved = (extra = {}) => namedVariant({ _id: id, ...extra });
+  assert.deepEqual(errorsOf(validateUpdateProduct({ hasVariants: true, variants: [] })), ['variants']);
+  assert.deepEqual(errorsOf(validateUpdateProduct({ hasVariants: true, variants: [saved({ price: 0 })] })), ['variants.0.price']);
+  assert.deepEqual(errorsOf(validateUpdateProduct({ hasVariants: true, variants: [saved({ stock: -1 })] })), ['variants.0.stock']);
+  assert.deepEqual(errorsOf(validateUpdateProduct({ hasVariants: true, variants: [saved({ stock: '' })] })), ['variants.0.stock']);
+  assert.deepEqual(errorsOf(validateUpdateProduct({ hasVariants: true, variants: [saved({ imageUrlEnglish: [] })] })), ['variants.0.imageUrlEnglish']);
+  assert.deepEqual(errorsOf(validateUpdateProduct({ hasVariants: true, variants: [saved(), saved({ price: 99 })] })), ['variants.1.price']);
+  assert.deepEqual(errorsOf(validateUpdateProduct({ hasVariants: true, variants: [saved({ _id: 'nope' })] })), ['variants.0._id']);
+  assert.deepEqual(errorsOf(validateUpdateProduct({ hasVariants: true, variants: Array(21).fill(saved()) })), ['variants']);
+});
+
+test('a variant without an id is a new one, and the single-variant edit path is untouched', () => {
+  const fresh = namedVariant();               // no _id: created on save
+  const r = validateUpdateProduct({ hasVariants: true, variants: [namedVariant({ _id: id }), fresh] });
+  assert.equal(r.error, undefined);
+  assert.equal(r.data.variants[0]._id, id);
+  assert.equal(r.data.variants[1]._id, undefined);
+  // editing a single-item product still goes through `variant`, unchanged
+  assert.equal(validateUpdateProduct({ variant: { _id: id, price: 5, mrp: 6, stock: 1, imageUrlEnglish: [image] } }).error, undefined);
+});
+
+// The "Has Variants" checkbox is gone: the admin adds variants with a button and
+// the stored flag follows the count, so one variant is a product sold as a single
+// item and several is a product sold in choices.
+test('a product needs at least one variant, in either shape', () => {
+  assert.deepEqual(errorsOf(validateCreateProduct(without('variant'))), ['variants']);
+  assert.deepEqual(errorsOf(validateCreateProduct(without('variant', { variants: [] }))), ['variants']);
+  assert.equal(messageOf(validateCreateProduct(without('variant', { variants: [] })), 'variants'), 'Add at least one variant');
+  // one variant is enough, and needs no name of its own
+  const one = validateCreateProduct(without('variant', { variants: [variant()] }));
+  assert.equal(one.error, undefined);
+  assert.equal(one.data.variants.length, 1);
+  assert.equal(one.data.variants[0].nameEnglish, undefined);
+  // the legacy singular shape still saves, so older clients keep working
+  assert.equal(validateCreateProduct(product()).error, undefined);
+});
+
+test('a variant name is optional and only labels a choice', () => {
+  const blank = validateCreateProduct(without('variant', { variants: [variant({ nameEnglish: '', nameArabic: '' })] }));
+  assert.equal(blank.error, undefined);
+  const named = validateCreateProduct(without('variant', { variants: [namedVariant()] }));
+  assert.equal(named.data.variants[0].nameEnglish, 'Red');
+  // still capped
+  assert.deepEqual(errorsOf(validateCreateProduct(multi([namedVariant({ nameEnglish: 'x'.repeat(201) })]))),
+    ['variants.0.nameEnglish']);
+  // and optional on edit too
+  assert.equal(validateUpdateProduct({ variants: [{ _id: id, ...variant() }] }).error, undefined);
 });

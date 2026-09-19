@@ -94,10 +94,26 @@ const createVariantSchema = z.object({
 
 // A product sold in several variants: each one is the same block of fields plus
 // its own name, so the storefront can label the choice.
+// Each variant may carry its own name so the storefront can label the choice.
+// Left blank it inherits the product's name, which is what a product sold as a
+// single item has always stored.
 const createVariantsSchema = z.array(
   createVariantSchema.extend({
-    nameEnglish: requiredText(200, 'Enter the variant name', 'Variant name'),
-    nameArabic: requiredText(200, 'Enter the Arabic variant name', 'Arabic variant name')
+    nameEnglish: text(200, 'Variant name').optional(),
+    nameArabic: text(200, 'Variant name').optional()
+  })
+).min(1, 'Add at least one variant').max(20, 'Use 20 variants or fewer');
+
+// Editing a multi-variant product sends the whole list back. The rules are
+// looser than on create, because variants saved earlier may not satisfy them:
+// two hold a CSS colour name ("Red") rather than a hex value, which the
+// storefront renders correctly, and some have no Arabic images. Requiring
+// either would lock those products out of editing entirely.
+const editVariantsSchema = z.array(
+  defaultVariantSchema.extend({
+    nameEnglish: text(200, 'Variant name').optional(),
+    nameArabic: text(200, 'Variant name').optional(),
+    color: z.string().trim().min(1, 'Pick a colour').optional()
   })
 ).min(1, 'Add at least one variant').max(20, 'Use 20 variants or fewer');
 
@@ -117,7 +133,8 @@ const createProductSchema = z.object({
 // Updates may send any subset of the fields.
 const updateProductSchema = z.object({
   ...Object.fromEntries(Object.entries(productFields).map(([k, v]) => [k, v.optional()])),
-  variant: defaultVariantSchema.optional()
+  variant: defaultVariantSchema.optional(),
+  variants: editVariantsSchema.optional()
 });
 
 // Clients before this change sent `hasVariant` (singular), which was silently ignored.
@@ -162,11 +179,9 @@ const validateCreateProduct = (rawBody) => {
   const issues = parsed.success ? [] : [...parsed.error.issues];
   // Checked here rather than in the schema so it is reported together with any
   // field errors (zod skips object-level refinements while a field is invalid).
-  const multi = parseBoolean(body.hasVariants, false);
-  if (!multi && !body.variant) {
-    issues.push({ path: ['variant'], message: 'Add the price, stock and at least one image' });
-  }
-  if (multi && !body.variants) {
+  // The admin form sends `variants`; `variant` is the shape older clients sent
+  // for a product sold as a single item. Either way there must be one.
+  if (!body.variants && !body.variant) {
     issues.push({ path: ['variants'], message: 'Add at least one variant' });
   }
   issues.push(...priceIssues(body, issues));
@@ -310,13 +325,14 @@ const createProduct = async (req, res) => {
       description: fields.description || [],
       isNew: fields.isNew ?? false,
       isFeatured: fields.isFeatured ?? false,
-      hasVariants: fields.hasVariants ?? false,
+      // Derived, not asked for: the admin adds variants and the flag follows.
+      hasVariants: (variants || [variant]).length > 1,
       status: fields.status || 'active'
     });
 
-    // Both shapes are saved with the product rather than after it, so a failure
-    // cannot leave a product with no price, images or variants to sell.
-    const submitted = product.hasVariants ? variants : [variant];
+    // Saved with the product rather than after it, so a failure cannot leave a
+    // product with no price, images or variants to sell.
+    const submitted = variants || [variant];
     let savedVariants = [];
     try {
       savedVariants = await ProductVariants.insertMany(submitted.map((v) => variantDocument(product, v)));
@@ -352,7 +368,7 @@ const updateProduct = async (req, res) => {
 
     const { data, error } = validateUpdateProduct(req.body);
     if (error) return res.status(400).json(error);
-    const { variant, ...updates } = data;
+    const { variant, variants, ...updates } = data;
 
     const referenceError = await checkReferences(updates);
     if (referenceError) return res.status(400).json(referenceError);
@@ -368,6 +384,23 @@ const updateProduct = async (req, res) => {
       return res.status(400).json(validationFailure([{ path: ['variant'], message: 'This variant does not belong to the product' }]));
     }
 
+    // Every id sent back must be a variant of this product, so one product's
+    // edit can never rewrite another's.
+    const updatesVariants = !!variants;
+    if (updatesVariants) {
+      const sentIds = variants.filter((v) => v._id).map((v) => v._id);
+      const owned = sentIds.length
+        ? await ProductVariants.countDocuments({ _id: { $in: sentIds }, product: existing._id })
+        : 0;
+      if (owned !== sentIds.length) {
+        return res.status(400).json(validationFailure([
+          { path: ['variants'], message: 'One of these variants does not belong to the product' }
+        ]));
+      }
+    }
+
+    // The flag follows the variant count whenever the list is being replaced.
+    if (updatesVariants) updates.hasVariants = variants.length > 1;
     await Product.updateOne({ _id: id }, updates, { runValidators: true });
     const updatedProduct = await findPopulated(id);
 
@@ -379,7 +412,32 @@ const updateProduct = async (req, res) => {
         : await ProductVariants.create(doc);
     }
 
-    res.json({ ...updatedProduct.toObject(), variant: savedVariant });
+    let savedVariants = [];
+    if (updatesVariants) {
+      // The submitted list is the whole truth: ids are updated, new entries are
+      // created, and anything left out is deactivated rather than deleted — the
+      // same soft delete the variant endpoint performs, so nothing is lost and a
+      // removal can be undone.
+      savedVariants = await Promise.all(variants.map((v) => {
+        const doc = variantDocument(updatedProduct, v);
+        return v._id
+          ? ProductVariants.findByIdAndUpdate(v._id, doc, { new: true, runValidators: true })
+          : ProductVariants.create(doc);
+      }));
+      const keptIds = savedVariants.map((v) => v._id);
+      await ProductVariants.updateMany(
+        { product: existing._id, status: 'active', _id: { $nin: keptIds } },
+        { status: 'inactive' }
+      );
+    } else if (hasVariants) {
+      savedVariants = await ProductVariants.find({ product: existing._id, status: 'active' });
+    }
+
+    res.json({
+      ...updatedProduct.toObject(),
+      variant: savedVariant,
+      variants: updatesVariant && savedVariant ? [savedVariant] : savedVariants
+    });
   } catch (error) {
     console.error('Update product error:', error);
     res.status(500).json({ message: 'The product could not be updated. Please try again.' });
