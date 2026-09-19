@@ -32,6 +32,9 @@ const getAllUsers = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const sort = {};
     sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    // Tiebreak on _id: sorting by a field with repeated values (status, name...)
+    // is not a total order, and skip/limit over one hides rows from every page.
+    sort._id = -1;
 
     const users = await User.find(query)
       .select('-password')
@@ -72,7 +75,7 @@ const getUserById = async (req, res) => {
       .populate('coupon', 'code discount')
       .populate('orderItem.product', 'nameEnglish nameArabic')
       .populate('orderItem.variant', 'nameEnglish nameArabic size color price mrp stock imageUrlEnglish imageUrlArabic')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1, _id: -1 });
 
     // Calculate total orders count
     const totalOrdersCount = orders.length;
@@ -182,7 +185,8 @@ const getUserStats = async (req, res) => {
     // Recent registrations
     const recentUsers = await User.find(dateFilter)
       .select('name email status createdAt')
-      .sort({ createdAt: -1 })
+      // _id tiebreaks so the same 5 come back on every refresh.
+      .sort({ createdAt: -1, _id: -1 })
       .limit(5);
 
     // Users registered today

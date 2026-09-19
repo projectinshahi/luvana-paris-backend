@@ -1,4 +1,5 @@
 const cloudinary = require('cloudinary').v2;
+const { findImageReferences } = require('../../utils/imageReferences');
 
 // Configure Cloudinary
 cloudinary.config({
@@ -128,9 +129,18 @@ const deleteImage = async (req, res) => {
       return res.status(400).json({ message: 'Public ID is required' });
     }
 
+    // Never delete an image a saved record still shows. Forms used to delete before
+    // saving; when the save then failed, the record kept pointing at an image that no
+    // longer existed, and every resized copy of it (all the storefront requests) 404'd.
+    const usedBy = await findImageReferences(publicId);
+    if (usedBy.length > 0) {
+      return res.status(409).json({ message: 'This image is still in use, so it was not deleted.', usedBy });
+    }
+
     const result = await cloudinary.uploader.destroy(publicId);
 
-    if (result.result === 'ok') {
+    // "not found" means it is already gone, which is what the caller wants
+    if (result.result === 'ok' || result.result === 'not found') {
       res.json({ message: 'Image deleted successfully' });
     } else {
       res.status(400).json({ message: 'Failed to delete image' });

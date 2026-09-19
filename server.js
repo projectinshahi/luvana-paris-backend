@@ -70,14 +70,17 @@ app.listen(PORT, () => {
   console.log(`Server is running on http://localhost: ${PORT}`);
 });
 // error handler
+// Errors reach API clients as JSON they can read ({ message }) rather than an HTML
+// page: malformed JSON bodies, oversized requests and anything unexpected.
 app.use(function(err, req, res, next) {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-  // render the error page
-  res.status(err.status || 500);
-  res.render('error');
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) console.error(err);
+  const message =
+    err.type === 'entity.parse.failed' ? 'The request body is not valid JSON.'
+    : err.type === 'entity.too.large' ? 'The request is too large.'
+    : status >= 500 ? 'Internal server error'
+    : err.expose ? err.message : 'Bad request';
+  res.status(status).json({ message });
 });
 
 module.exports = app;

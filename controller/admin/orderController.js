@@ -47,6 +47,10 @@ const getAllOrders = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const sort = {};
     sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    // Tiebreak on _id: sorting by a field with repeated values (status,
+    // paymentStatus...) is not a total order, and skip/limit over one hides
+    // orders from every page.
+    sort._id = -1;
 
     const orders = await Order.find(query)
       .populate('user', 'name email phone')
@@ -242,7 +246,8 @@ const getOrderStats = async (req, res) => {
     // Recent orders
     const recentOrders = await Order.find(dateFilter)
       .populate('user', 'name email')
-      .sort({ createdAt: -1 })
+      // _id tiebreaks so the same 5 come back on every refresh.
+      .sort({ createdAt: -1, _id: -1 })
       .limit(5)
       .select('orderId status paymentStatus price createdAt');
 
