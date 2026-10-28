@@ -7,7 +7,7 @@ const ProductVariants = require('../../model/productVariantsModel');
 const Influencer = require('../../model/influencerModel');
 const { loadCurrencyConverter } = require('./currencyConversions');
 
-const BRAND_FIELDS = 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic';
+const BRAND_FIELDS = 'nameEnglish nameArabic logoUrlEnglish logoUrlArabic brandImageEnglish brandImageArabic brandMobileImageEnglish brandMobileImageArabic';
 
 const getHome = async (req, res) => {
   try {

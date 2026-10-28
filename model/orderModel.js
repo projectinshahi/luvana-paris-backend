@@ -15,9 +15,12 @@ const orderSchema = new mongoose.Schema({
     },
     paymentStatus: {
       type: String,
-      enum: ['pending', 'paid', 'failed', 'refunded'],
+      enum: ['pending', 'authorized', 'paid', 'failed', 'refunded'],
       default: 'pending',
     },
+    tapChargeId: { type: String },       // legacy — kept until migration completes
+    paymentReference: { type: String },  // provider-neutral reference (use this)
+    paymentProvider: { type: String, default: 'tap' },
     orderItem: [
         {
             product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
@@ -35,6 +38,11 @@ const orderSchema = new mongoose.Schema({
 {
     timestamps: true, 
 });
+
+orderSchema.index({ tapChargeId: 1 }, { unique: true, sparse: true });       // legacy
+orderSchema.index({ paymentReference: 1 }, { unique: true, sparse: true }); // current
+orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index({ status: 1, paymentStatus: 1 });
 
 const Order = mongoose.model('Order', orderSchema);
 

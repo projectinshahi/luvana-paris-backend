@@ -23,6 +23,8 @@ const userAddressSchema = new mongoose.Schema({
     timestamps: true, 
 });
 
+userAddressSchema.index({ user: 1, status: 1 });
+
 const UserAddress = mongoose.model('UserAddress', userAddressSchema);
 
 module.exports = UserAddress;

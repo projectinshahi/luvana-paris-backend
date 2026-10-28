@@ -28,6 +28,8 @@ const productVariantsSchema = new mongoose.Schema({
     timestamps: true, 
 });
 
+productVariantsSchema.index({ product: 1, status: 1 });
+
 const ProductVariants = mongoose.model('ProductVariants', productVariantsSchema);
 
 module.exports = ProductVariants;

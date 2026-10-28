@@ -20,40 +20,67 @@ const getDashboard = async (req, res) => {
       }
     }
 
-    // 1. Get total counts
-    const totalOrders = await Order.countDocuments(dateFilter);
-    const totalUsers = await User.countDocuments({});
-    const totalProducts = await Product.countDocuments({ status: 'active' });
-    const totalActiveUsers = await User.countDocuments({ status: 'active' });
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const previousPeriodStart = new Date(sevenDaysAgo);
+    previousPeriodStart.setDate(previousPeriodStart.getDate() - 7);
 
-    // 2. Get total sales amount (paid orders only)
-    const salesData = await Order.aggregate([
-      {
-        $match: {
-          ...dateFilter,
-          paymentStatus: 'paid'
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalSales: { $sum: '$price' },
-          totalDiscount: { $sum: '$discount' },
-          totalShipping: { $sum: '$shippingCharges' }
-        }
-      }
+    // Run all independent DB queries in parallel
+    const [
+      totalOrders,
+      totalUsers,
+      totalProducts,
+      totalActiveUsers,
+      salesData,
+      recentOrders,
+      topSellingProducts,
+      orderStatusBreakdown,
+      paymentStatusBreakdown,
+      ordersByDate,
+      previousPeriodOrders,
+      currentPeriodOrders,
+      previousPeriodSales,
+    ] = await Promise.all([
+      Order.countDocuments(dateFilter),
+      User.countDocuments({}),
+      Product.countDocuments({ status: 'active' }),
+      User.countDocuments({ status: 'active' }),
+      Order.aggregate([
+        { $match: { ...dateFilter, paymentStatus: 'paid' } },
+        { $group: { _id: null, totalSales: { $sum: '$price' }, totalDiscount: { $sum: '$discount' }, totalShipping: { $sum: '$shippingCharges' } } }
+      ]),
+      Order.find(dateFilter)
+        .populate('user', 'name email phone')
+        .populate('orderItem.product', 'nameEnglish nameArabic')
+        .sort({ createdAt: -1 })
+        .limit(10),
+      Order.aggregate([
+        { $match: { ...dateFilter, paymentStatus: 'paid' } },
+        { $unwind: '$orderItem' },
+        { $group: { _id: '$orderItem.product', totalQuantity: { $sum: '$orderItem.quantity' }, totalRevenue: { $sum: { $multiply: ['$orderItem.quantity', '$orderItem.price'] } }, productName: { $first: '$orderItem.productNameEnglish' }, productNameArabic: { $first: '$orderItem.productNameArabic' } } },
+        { $sort: { totalQuantity: -1 } },
+        { $limit: 10 },
+        { $lookup: { from: 'products', localField: '_id', foreignField: '_id', as: 'productDetails' } },
+        { $addFields: { productDetails: { $arrayElemAt: ['$productDetails', 0] } } }
+      ]),
+      Order.aggregate([{ $match: dateFilter }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Order.aggregate([{ $match: dateFilter }, { $group: { _id: '$paymentStatus', count: { $sum: 1 } } }]),
+      Order.aggregate([
+        { $match: { createdAt: { $gte: sevenDaysAgo }, paymentStatus: 'paid' } },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 }, revenue: { $sum: '$price' } } },
+        { $sort: { _id: 1 } }
+      ]),
+      Order.countDocuments({ createdAt: { $gte: previousPeriodStart, $lt: sevenDaysAgo } }),
+      Order.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+      Order.aggregate([
+        { $match: { createdAt: { $gte: previousPeriodStart, $lt: sevenDaysAgo }, paymentStatus: 'paid' } },
+        { $group: { _id: null, totalSales: { $sum: '$price' } } }
+      ]),
     ]);
 
     const totalSalesAmount = salesData[0]?.totalSales || 0;
     const totalDiscount = salesData[0]?.totalDiscount || 0;
     const totalShipping = salesData[0]?.totalShipping || 0;
-
-    // 3. Get recent orders (last 10)
-    const recentOrders = await Order.find(dateFilter)
-      .populate('user', 'name email phone')
-      .populate('orderItem.product', 'nameEnglish nameArabic')
-      .sort({ createdAt: -1 })
-      .limit(10);
 
     const formattedRecentOrders = recentOrders.map(order => ({
       id: order._id,
@@ -74,41 +101,6 @@ const getDashboard = async (req, res) => {
       date: order.createdAt
     }));
 
-    // 4. Get top selling products
-    const topSellingProducts = await Order.aggregate([
-      {
-        $match: {
-          ...dateFilter,
-          paymentStatus: 'paid'
-        }
-      },
-      { $unwind: '$orderItem' },
-      {
-        $group: {
-          _id: '$orderItem.product',
-          totalQuantity: { $sum: '$orderItem.quantity' },
-          totalRevenue: { $sum: { $multiply: ['$orderItem.quantity', '$orderItem.price'] } },
-          productName: { $first: '$orderItem.productNameEnglish' },
-          productNameArabic: { $first: '$orderItem.productNameArabic' }
-        }
-      },
-      { $sort: { totalQuantity: -1 } },
-      { $limit: 10 },
-      {
-        $lookup: {
-          from: 'products',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'productDetails'
-        }
-      },
-      {
-        $addFields: {
-          productDetails: { $arrayElemAt: ['$productDetails', 0] }
-        }
-      }
-    ]);
-
     const formattedTopProducts = topSellingProducts.map(product => ({
       productId: product._id,
       productName: product.productName || product.productDetails?.nameEnglish || 'Unknown',
@@ -118,98 +110,15 @@ const getDashboard = async (req, res) => {
       imageUrl: product.productDetails?.imageUrlEnglish?.[0]?.imageUrl
     }));
 
-    // 5. Get order status breakdown
-    const orderStatusBreakdown = await Order.aggregate([
-      { $match: dateFilter },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
     const statusBreakdown = {};
-    orderStatusBreakdown.forEach(item => {
-      statusBreakdown[item._id] = item.count;
-    });
-
-    // 6. Get payment status breakdown
-    const paymentStatusBreakdown = await Order.aggregate([
-      { $match: dateFilter },
-      {
-        $group: {
-          _id: '$paymentStatus',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
+    orderStatusBreakdown.forEach(item => { statusBreakdown[item._id] = item.count; });
 
     const paymentBreakdown = {};
-    paymentStatusBreakdown.forEach(item => {
-      paymentBreakdown[item._id] = item.count;
-    });
+    paymentStatusBreakdown.forEach(item => { paymentBreakdown[item._id] = item.count; });
 
-    // 7. Get orders by date for the last 7 days
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    const ordersByDate = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: sevenDaysAgo },
-          paymentStatus: 'paid'
-        }
-      },
-      {
-        $group: {
-          _id: {
-            $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
-          },
-          count: { $sum: 1 },
-          revenue: { $sum: '$price' }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ]);
-
-    // 8. Calculate growth metrics
-    const previousPeriodStart = new Date(sevenDaysAgo);
-    previousPeriodStart.setDate(previousPeriodStart.getDate() - 7);
-
-    const previousPeriodOrders = await Order.countDocuments({
-      createdAt: {
-        $gte: previousPeriodStart,
-        $lt: sevenDaysAgo
-      }
-    });
-
-    const currentPeriodOrders = await Order.countDocuments({
-      createdAt: { $gte: sevenDaysAgo }
-    });
-
-    const orderGrowth = previousPeriodOrders > 0 
+    const orderGrowth = previousPeriodOrders > 0
       ? (((currentPeriodOrders - previousPeriodOrders) / previousPeriodOrders) * 100).toFixed(2)
       : 100;
-
-    // Get previous period sales
-    const previousPeriodSales = await Order.aggregate([
-      {
-        $match: {
-          createdAt: {
-            $gte: previousPeriodStart,
-            $lt: sevenDaysAgo
-          },
-          paymentStatus: 'paid'
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalSales: { $sum: '$price' }
-        }
-      }
-    ]);
 
     const previousSalesAmount = previousPeriodSales[0]?.totalSales || 0;
     const salesGrowth = previousSalesAmount > 0
