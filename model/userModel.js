@@ -46,7 +46,7 @@ userSchema.methods.comparePassword = function (candidatePassword) {
 
 // Method to generate an access token
 userSchema.methods.generateAccessToken = function () {
-  return jwt.sign({ userId: this._id }, 'this_luvana756#', { expiresIn: '30d' });
+  return jwt.sign({ userId: this._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
 
 const User = mongoose.model('User', userSchema);

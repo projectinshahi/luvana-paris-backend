@@ -46,8 +46,7 @@ adminSchema.methods.comparePassword = function (candidatePassword) {
 
 // Method to generate an access token
 adminSchema.methods.generateAccessToken = function () {
-  return jwt.sign({ userId: this._id }, 'this_luvana756#', { expiresIn: '15d' });
-  // return jwt.sign({ userId: this._id, role: this.role }, 'this_luvana756#', { expiresIn: '15d' });
+  return jwt.sign({ userId: this._id }, process.env.JWT_SECRET, { expiresIn: '15d' });
 };
 
 const Admin = mongoose.model('Admin', adminSchema);

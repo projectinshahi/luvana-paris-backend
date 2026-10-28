@@ -21,4 +21,7 @@ router.delete('/:cartItemId', cartController.removeFromCart);
 // DELETE /users/cart/clear-all - Clear entire cart
 router.delete('/clear-all', cartController.clearCart);
 
+// POST /users/cart/validate - Check item availability before initiating payment
+router.post('/validate', cartController.validateCart);
+
 module.exports = router;

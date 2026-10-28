@@ -25,6 +25,8 @@ const bannerSchema = new mongoose.Schema({
     timestamps: true, 
 });
 
+bannerSchema.index({ status: 1, sortOrder: 1 });
+
 const Banner = mongoose.model('Banner', bannerSchema);
 
 module.exports = Banner;

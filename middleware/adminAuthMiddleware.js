@@ -11,15 +11,16 @@ const adminAuthMiddleware = async (req, res, next) => {
     }
 
     // Verify token
-    const decoded = jwt.verify(token, 'this_luvana756#');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Get admin from database
-    const admin = await Admin.findById(decoded.userId);
+    const admin = await Admin.findById(decoded.userId).select('_id status').lean();
     if (!admin) {
       return res.status(401).json({ message: 'Admin not found' });
     }
+    if (admin.status === 'inactive') {
+      return res.status(401).json({ message: 'Admin account is inactive' });
+    }
 
-    // Attach admin to request
     req.admin = admin;
     next();
   } catch (error) {

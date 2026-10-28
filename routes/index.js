@@ -1,5 +1,5 @@
 var express = require('express');
-const { postTabWebhook } = require('../controller/webhookController');
+const { postTabWebhook, postMyfatoorahWebhook } = require('../controller/webhookController');
 var router = express.Router();
 
 /* GET home page. */
@@ -8,5 +8,6 @@ router.get('/', function(req, res, next) {
 });
 
 router.post('/tap/webhook', postTabWebhook);
+router.post('/myfatoorah/webhook', postMyfatoorahWebhook);
 
 module.exports = router;

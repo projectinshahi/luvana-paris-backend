@@ -52,17 +52,18 @@ const getAllOrders = async (req, res) => {
     // orders from every page.
     sort._id = -1;
 
-    const orders = await Order.find(query)
-      .populate('user', 'name email phone')
-      .populate('shippingAddress')
-      .populate('coupon', 'code discount')
-      .populate('orderItem.product', 'nameEnglish nameArabic')
-      .populate('orderItem.variant', 'nameEnglish nameArabic size color price mrp stock imageUrlEnglish imageUrlArabic')
-      .sort(sort)
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const totalOrders = await Order.countDocuments(query);
+    const [orders, totalOrders] = await Promise.all([
+      Order.find(query)
+        .populate('user', 'name email phone')
+        .populate('shippingAddress')
+        .populate('coupon', 'code discount')
+        .populate('orderItem.product', 'nameEnglish nameArabic')
+        .populate('orderItem.variant', 'nameEnglish nameArabic size color price mrp stock imageUrlEnglish imageUrlArabic')
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit)),
+      Order.countDocuments(query),
+    ]);
 
     res.json({
       orders,
@@ -117,20 +118,20 @@ const updateOrderStatus = async (req, res) => {
       });
     }
 
-    const order = await Order.findById(id);
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
-
-    order.status = status;
-    await order.save();
-
-    const updatedOrder = await Order.findById(id)
+    const updatedOrder = await Order.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    )
       .populate('user', 'name email phone')
       .populate('shippingAddress')
       .populate('coupon', 'code discount')
       .populate('orderItem.product', 'nameEnglish nameArabic')
       .populate('orderItem.variant', 'nameEnglish nameArabic size color price mrp stock imageUrlEnglish imageUrlArabic');
+
+    if (!updatedOrder) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
 
     res.json({
       message: 'Order status updated successfully',
@@ -148,7 +149,7 @@ const updatePaymentStatus = async (req, res) => {
     const { id } = req.params;
     const { paymentStatus } = req.body;
 
-    const validPaymentStatuses = ['pending', 'paid', 'failed', 'refunded'];
+    const validPaymentStatuses = ['pending', 'authorized', 'paid', 'failed', 'refunded'];
     
     if (!paymentStatus || !validPaymentStatuses.includes(paymentStatus)) {
       return res.status(400).json({
@@ -157,20 +158,20 @@ const updatePaymentStatus = async (req, res) => {
       });
     }
 
-    const order = await Order.findById(id);
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
-
-    order.paymentStatus = paymentStatus;
-    await order.save();
-
-    const updatedOrder = await Order.findById(id)
+    const updatedOrder = await Order.findByIdAndUpdate(
+      id,
+      { paymentStatus },
+      { new: true, runValidators: true }
+    )
       .populate('user', 'name email phone')
       .populate('shippingAddress')
       .populate('coupon', 'code discount')
       .populate('orderItem.product', 'nameEnglish nameArabic')
       .populate('orderItem.variant', 'nameEnglish nameArabic size color price mrp stock imageUrlEnglish imageUrlArabic');
+
+    if (!updatedOrder) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
 
     res.json({
       message: 'Payment status updated successfully',

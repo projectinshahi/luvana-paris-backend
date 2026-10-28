@@ -1,5 +1,6 @@
 const Cart = require('../../model/cartModel');
 const ProductVariants = require('../../model/productVariantsModel');
+const Product = require('../../model/productModel');
 const Coupon = require('../../model/couponModel');
 const { loadCurrencyConverter } = require('./currencyConversions');
 
@@ -19,10 +20,19 @@ const addToCart = async (req, res) => {
       return res.status(400).json({ message: 'Quantity must be a positive integer' });
     }
 
-    // Get variant details to validate stock
+    // Get variant details to validate status and stock
     const variantData = await ProductVariants.findById(variant);
     if (!variantData) {
       return res.status(404).json({ message: 'Variant not found' });
+    }
+
+    if (variantData.status !== 'active') {
+      return res.status(400).json({ message: 'This item is no longer available' });
+    }
+
+    const productData = await Product.findById(variantData.product).select('status').lean();
+    if (!productData || productData.status !== 'active') {
+      return res.status(400).json({ message: 'This product is no longer available' });
     }
 
     if (variantData.stock < quantity) {
@@ -66,13 +76,19 @@ const addToCart = async (req, res) => {
 };
 
 // Get cart with all calculations
+const CART_DP = { KWD: 3, BHD: 3, OMR: 3 };
+function cartRound(n, currency = 'KWD') {
+  const dp = CART_DP[currency] ?? 2;
+  return Number(n.toFixed(dp));
+}
+
 const getCart = async (req, res) => {
   try {
     const userId = req.user._id; // Assuming authentication middleware sets req.user
 
     // Get all cart items for user
     const cartItems = await Cart.find({ user: userId })
-      .populate('product', 'nameEnglish nameArabic')
+      .populate('product', 'nameEnglish nameArabic status')
       .populate('variant')
       .populate('coupon');
 
@@ -91,13 +107,23 @@ const getCart = async (req, res) => {
 
     const convert = await loadCurrencyConverter();
 
-    // Calculate prices for each item
+    // Calculate prices for each item; flag unavailable items so the frontend
+    // can inform the customer without silently removing their cart data.
     const enrichedItems = await Promise.all(
       cartItems.map(async (item) => {
         const variant = item.variant;
         const itemPrice = variant.price * item.quantity;
         const mrpPrice = variant.mrp * item.quantity;
         const itemDiscount = mrpPrice - itemPrice;
+
+        let unavailable = null;
+        if (variant.status !== 'active') {
+          unavailable = 'variant_inactive';
+        } else if (item.product && item.product.status !== 'active') {
+          unavailable = 'product_inactive';
+        } else if (variant.stock !== undefined && variant.stock < item.quantity) {
+          unavailable = 'out_of_stock';
+        }
 
         return {
           _id: item._id,
@@ -117,7 +143,8 @@ const getCart = async (req, res) => {
           itemPrice,
           mrpPrice,
           itemDiscount,
-          coupon: item.coupon
+          coupon: item.coupon,
+          unavailable,
         };
       })
     );
@@ -153,14 +180,14 @@ const getCart = async (req, res) => {
       summary: {
         itemCount: enrichedItems.length,
         totalQuantity: enrichedItems.reduce((sum, item) => sum + item.quantity, 0),
-        subtotal: Number(subtotal.toFixed(2)),
-        mrpTotal: Number(totalMrp.toFixed(2)),
-        discount: Number(discount.toFixed(2)),
+        subtotal: cartRound(subtotal),
+        mrpTotal: cartRound(totalMrp),
+        discount: cartRound(discount),
         discountPercentage: totalMrp > 0 ? Number(((discount / totalMrp) * 100).toFixed(2)) : 0,
         couponCode: couponCode,
-        couponDiscount: Number(couponDiscount.toFixed(2)),
-        tax: Number(tax.toFixed(2)),
-        total: Number(total.toFixed(2))
+        couponDiscount: cartRound(couponDiscount),
+        tax: cartRound(tax),
+        total: cartRound(total)
       }
     });
   } catch (error) {
@@ -212,6 +239,16 @@ const updateCartItem = async (req, res) => {
       return res.status(404).json({ message: 'Cart item not found' });
     }
 
+    // Reject updates to inactive or unavailable items
+    if (cartItem.variant.status !== 'active') {
+      return res.status(400).json({ message: 'This item is no longer available' });
+    }
+
+    const productData = await Product.findById(cartItem.variant.product).select('status').lean();
+    if (!productData || productData.status !== 'active') {
+      return res.status(400).json({ message: 'This product is no longer available' });
+    }
+
     // Check stock availability
     if (cartItem.variant.stock < quantity) {
       return res.status(400).json({ message: `Insufficient stock. Available: ${cartItem.variant.stock}` });
@@ -244,10 +281,58 @@ const clearCart = async (req, res) => {
   }
 };
 
+// Validate cart items before payment — checks active status and stock
+// POST /user/cart/validate  body: { items: [{ variant, quantity }] }
+const validateCart = async (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'items array is required' });
+    }
+
+    const variantIds = items.map(i => i.variant).filter(Boolean);
+    const variants = await ProductVariants.find({ _id: { $in: variantIds } })
+      .populate('product', 'nameEnglish status');
+
+    const variantsById = variants.reduce((acc, v) => { acc[String(v._id)] = v; return acc; }, {});
+
+    const unavailable = [];
+    for (const item of items) {
+      const vid = String(item.variant);
+      const variant = variantsById[vid];
+
+      if (!variant) {
+        unavailable.push({ variantId: vid, name: 'Unknown item', reason: 'not_found' });
+        continue;
+      }
+      if (variant.status !== 'active') {
+        const name = variant.nameEnglish || variant.nameArabic || 'Item';
+        unavailable.push({ variantId: vid, name, reason: 'variant_inactive' });
+        continue;
+      }
+      if (variant.product && variant.product.status !== 'active') {
+        const name = variant.product.nameEnglish || variant.nameEnglish || 'Item';
+        unavailable.push({ variantId: vid, name, reason: 'product_inactive' });
+        continue;
+      }
+      if (variant.stock !== undefined && variant.stock < Number(item.quantity || 1)) {
+        const name = variant.nameEnglish || 'Item';
+        unavailable.push({ variantId: vid, name, reason: 'out_of_stock' });
+      }
+    }
+
+    return res.json({ valid: unavailable.length === 0, unavailable });
+  } catch (error) {
+    console.error('validateCart error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 module.exports = {
   addToCart,
   getCart,
   removeFromCart,
   updateCartItem,
-  clearCart
+  clearCart,
+  validateCart,
 };
