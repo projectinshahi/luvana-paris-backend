@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 // var createError = require('http-errors');
 var path = require('path');
@@ -7,7 +8,6 @@ const cors = require('cors');
 const session = require('express-session');
 const passport = require('passport');
 require('./config/passport');
-require('dotenv').config();
 
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
