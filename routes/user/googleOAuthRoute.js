@@ -4,7 +4,7 @@ const passport = require('passport');
 const googleOAuthController = require('../../controller/user/googleOAuthController');
 
 // Initiate Google OAuth login
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], prompt: 'select_account' }));
 
 // Google OAuth callback — Passport verifies, then controller redirects to frontend with one-time code
 router.get(
