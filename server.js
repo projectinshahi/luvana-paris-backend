@@ -69,6 +69,14 @@ if (!SESSION_SECRET) {
   }
   console.warn('[SECURITY] SESSION_SECRET not set. Using an insecure development fallback. Set SESSION_SECRET before deploying to production.');
 }
+
+if (!process.env.BACKEND_URL) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[FATAL] BACKEND_URL must be set in production (e.g. https://api.luvanaparis.com). Google OAuth callbackURL will be wrong without it.');
+    process.exit(1);
+  }
+  console.warn('[GOOGLE OAUTH] BACKEND_URL not set — callbackURL defaults to http://localhost:8000. Register that URI in Google Cloud Console for local dev.');
+}
 app.use(session({
   secret: SESSION_SECRET || 'dev-insecure-do-not-deploy',
   resave: false,
