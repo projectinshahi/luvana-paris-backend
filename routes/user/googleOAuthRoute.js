@@ -10,7 +10,7 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
 router.get(
   '/google/callback',
   passport.authenticate('google', {
-    failureRedirect: `${process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'http://localhost:4000'}?error=google_auth_failed`,
+    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:4000'}/auth/google?error=google_auth_failed`,
     session: false,
   }),
   googleOAuthController.googleCallback
